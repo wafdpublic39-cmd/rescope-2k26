@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RESCOPE 2K26 — Admin</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">RESCOPE <span class="brand-year">2K26</span></div>
+    <nav class="nav-links">
+      <a href="index.html">Standings</a>
+      <a href="signin.html">Team Access</a>
+      <a href="admin.html" class="active">Admin</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ============ ADMIN PASSWORD GATE ============ -->
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <h2>Admin Access</h2>
+    <span class="sub">Master password required to open the command center.</span>
+    <div class="field">
+      <label for="admin-password">Master password</label>
+      <input type="password" id="admin-password" placeholder="Enter master password" />
+    </div>
+    <button class="btn btn-block" id="admin-login-btn">Unlock Dashboard</button>
+    <div class="error-text" id="gate-error"></div>
+  </div>
+</div>
+
+<!-- ============ ADMIN DASHBOARD ============ -->
+<main class="container hidden" id="dashboard">
+
+  <section class="section" style="border-bottom:none;padding-bottom:0;">
+    <div class="section-head">
+      <h2>Command Center</h2>
+      <button class="btn btn-outline" id="signout-btn">Lock Dashboard</button>
+    </div>
+  </section>
+
+  <!-- ---- Event Program Manager ---- -->
+  <section class="section two-col">
+    <div class="panel">
+      <h3 style="margin-bottom:18px;font-size:1.1rem;">Add Program</h3>
+      <form id="add-program-form">
+        <div class="field">
+          <label for="program-code">Program code</label>
+          <input type="text" id="program-code" placeholder="e.g. FA-01" required />
+        </div>
+        <div class="field">
+          <label for="program-title">Title</label>
+          <input type="text" id="program-title" placeholder="e.g. Solo Dance" required />
+        </div>
+        <button type="submit" class="btn btn-signal btn-block">Add Program</button>
+      </form>
+      <div id="add-program-status"></div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-bottom:18px;font-size:1.1rem;">Existing Programs</h3>
+      <div id="program-list"></div>
+    </div>
+  </section>
+
+  <!-- ---- Points Ledger Adjuster ---- -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Points Ledger Adjuster</h2>
+      <span class="section-num">Auto-updates program · candidate · house</span>
+    </div>
+
+    <div class="panel">
+      <form id="ledger-form">
+        <div class="grid-2">
+          <div class="field">
+            <label for="ledger-program">Program</label>
+            <select id="ledger-program" required>
+              <option value="">— Select program —</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ledger-code">Candidate code</label>
+            <input type="text" id="ledger-code" placeholder="e.g. HZ07" required />
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label>Action</label>
+            <div class="segmented" id="action-toggle">
+              <button type="button" class="active add" data-action="add">Add</button>
+              <button type="button" class="subtract" data-action="subtract">Subtract</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="ledger-value">Point value</label>
+            <input type="number" id="ledger-value" min="1" step="1" placeholder="e.g. 10" required />
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-block">Submit Ledger Entry</button>
+      </form>
+      <div id="ledger-status"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>RESCOPE 2K26 · Horizon · Eclipse · Vector · Chroma</footer>
+
+<script type="module">
+  import {
+    supabase,
+    ADMIN_PASSWORD,
+    addProgram,
+    deleteProgram,
+    awardPoints,
+    listenPrograms,
+  } from "./firebase-config.js";
+
+  const gate = document.getElementById("gate");
+  const dashboard = document.getElementById("dashboard");
+  const gateError = document.getElementById("gate-error");
+
+  document.getElementById("admin-login-btn").addEventListener("click", () => {
+    const pw = document.getElementById("admin-password").value;
+    gateError.textContent = "";
+
+    // Instantly catch configuration bugs before freezing layout
+    if (!supabase) {
+      gateError.textContent = "Database client missing! Set your Anon Key inside firebase-config.js first.";
+      return;
+    }
+
+    if (pw === ADMIN_PASSWORD) {
+      gate.classList.add("hidden");
+      dashboard.classList.remove("hidden");
+      startProgramListener();
+    } else {
+      gateError.textContent = "Incorrect master password.";
+    }
+  });
+
+  document.getElementById("signout-btn").addEventListener("click", () => {
+    document.getElementById("admin-password").value = "";
+    dashboard.classList.add("hidden");
+    gate.classList.remove("hidden");
+  });
+
+  let programsData = [];
+  let programListenerStarted = false;
+
+  function startProgramListener() {
+    if (programListenerStarted) return;
+    programListenerStarted = true;
+    listenPrograms((programs) => {
+      programsData = (programs || []).sort((a, b) => a.id.localeCompare(b.id));
+      renderProgramList();
+      renderLedgerProgramOptions();
+    });
+  }
+
+  function renderProgramList() {
+    const el = document.getElementById("program-list");
+    if (programsData.length === 0) {
+      el.innerHTML = `<div class="empty-state">No programs yet. Add one to get started.</div>`;
+      return;
+    }
+    el.innerHTML = programsData
+      .map(
+        (p) => `
+        <div class="roster-row">
+          <div class="who">
+            <span>${p.title}</span>
+            <span class="code">${p.id}</span>
+          </div>
+          <button class="btn btn-danger" data-delete="${p.id}" style="padding:8px 12px;font-size:0.72rem;">Delete</button>
+        </div>
+      `
+      )
+      .join("");
+
+    el.querySelectorAll("[data-delete]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm(`Delete program "${btn.dataset.delete}"? This cannot be undone.`)) return;
+        try {
+          await deleteProgram(btn.dataset.delete);
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+    });
+  }
+
+  function renderLedgerProgramOptions() {
+    const select = document.getElementById("ledger-program");
+    const current = select.value;
+    select.innerHTML =
+      `<option value="">— Select program —</option>` +
+      programsData.map((p) => `<option value="${p.id}">${p.id} — ${p.title}</option>`).join("");
+    if (current) select.value = current;
+  }
+
+  document.getElementById("add-program-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const codeInput = document.getElementById("program-code");
+    const titleInput = document.getElementById("program-title");
+    const statusEl = document.getElementById("add-program-status");
+    statusEl.innerHTML = "";
+    try {
+      const code = await addProgram(codeInput.value, titleInput.value);
+      statusEl.innerHTML = `<div class="status-msg ok">Program "${code}" added.</div>`;
+      codeInput.value = "";
+      titleInput.value = "";
+    } catch (err) {
+      statusEl.innerHTML = `<div class="status-msg err">${err.message}</div>`;
+    }
+  });
+
+  let currentAction = "add";
+  document.querySelectorAll("#action-toggle button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#action-toggle button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentAction = btn.dataset.action;
+    });
+  });
+
+  document.getElementById("ledger-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const programCode = document.getElementById("ledger-program").value;
+    const candidateCode = document.getElementById("ledger-code").value;
+    const rawValue = Number(document.getElementById("ledger-value").value);
+    const statusEl = document.getElementById("ledger-status");
+    statusEl.innerHTML = "";
+
+    if (!programCode) {
+      statusEl.innerHTML = `<div class="status-msg err">Select a program first.</div>`;
+      return;
+    }
+    if (!candidateCode.trim()) {
+      statusEl.innerHTML = `<div class="status-msg err">Enter a candidate code.</div>`;
+      return;
+    }
+    if (!rawValue || rawValue <= 0) {
+      statusEl.innerHTML = `<div class="status-msg err">Enter a positive point value.</div>`;
+      return;
+    }
+
+    const delta = currentAction === "add" ? rawValue : -rawValue;
+
+    try {
+      const result = await awardPoints(programCode, candidateCode, delta);
+      statusEl.innerHTML = `<div class="status-msg ok">
+        ${currentAction === "add" ? "Added" : "Subtracted"} ${rawValue} pt(s) for ${candidateCode.toUpperCase()} in ${programCode.toUpperCase()}.
+        New program score: ${result.newProgramScore} · New candidate total: ${result.newParticipantTotal}.
+      </div>`;
+      document.getElementById("ledger-code").value = "";
+      document.getElementById("ledger-value").value = "";
+    } catch (err) {
+      statusEl.innerHTML = `<div class="status-msg err">${err.message}</div>`;
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RESCOPE 2K26 — Team Access</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">RESCOPE <span class="brand-year">2K26</span></div>
+    <nav class="nav-links">
+      <a href="index.html">Standings</a>
+      <a href="signin.html" class="active">Team Access</a>
+      <a href="admin.html">Admin</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ============ LOGIN GATE ============ -->
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <h2>Team Access</h2>
+    <span class="sub">Sign in as a house lead to manage your roster.</span>
+
+    <div class="field">
+      <label for="team-select">House</label>
+      <select id="team-select">
+        <option value="">— Select your house —</option>
+        <option value="Horizon">Horizon</option>
+        <option value="Eclipse">Eclipse</option>
+        <option value="Vector">Vector</option>
+        <option value="Chroma">Chroma</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="team-passcode">Passcode</label>
+      <input type="password" id="team-passcode" placeholder="Enter house passcode" />
+    </div>
+
+    <button class="btn btn-block" id="team-login-btn">Sign In</button>
+    <div class="error-text" id="gate-error"></div>
+  </div>
+</div>
+
+<!-- ============ ROSTER DASHBOARD ============ -->
+<main class="container hidden" id="dashboard">
+
+  <section class="section" style="border-bottom:none;padding-bottom:0;">
+    <div class="section-head">
+      <h2 id="dash-title">House Roster</h2>
+      <button class="btn btn-outline" id="signout-btn">Sign Out</button>
+    </div>
+  </section>
+
+  <section class="section two-col">
+    <div class="panel">
+      <h3 style="margin-bottom:18px;font-size:1.1rem;">Register a Candidate</h3>
+      <form id="register-form">
+        <div class="field">
+          <label for="cand-name">Candidate name</label>
+          <input type="text" id="cand-name" placeholder="Full name" required />
+        </div>
+        <div class="field">
+          <label for="cand-code">Unique participant code</label>
+          <input type="text" id="cand-code" placeholder="e.g. HZ07" required />
+        </div>
+        <button type="submit" class="btn btn-signal btn-block">Add to Roster</button>
+      </form>
+      <div id="register-status"></div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-bottom:18px;font-size:1.1rem;">Active Roster</h3>
+      <div id="roster-list"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>RESCOPE 2K26 · Horizon · Eclipse · Vector · Chroma</footer>
+
+<script type="module">
+  import { HOUSES, registerParticipant, listenParticipants, houseById } from "./firebase-config.js";
+
+  const gate = document.getElementById("gate");
+  const dashboard = document.getElementById("dashboard");
+  const teamSelect = document.getElementById("team-select");
+  const teamPasscode = document.getElementById("team-passcode");
+  const gateError = document.getElementById("gate-error");
+  const dashTitle = document.getElementById("dash-title");
+
+  let currentTeam = null;
+  let allParticipants = [];
+  let rosterListener = null;
+
+  document.getElementById("team-login-btn").addEventListener("click", () => {
+    const teamId = teamSelect.value;
+    const passcode = teamPasscode.value;
+    gateError.textContent = "";
+
+    if (!teamId) {
+      gateError.textContent = "Select your house first.";
+      return;
+    }
+    const house = houseById(teamId);
+    if (!house || house.passcode !== passcode) {
+      gateError.textContent = "Incorrect passcode for that house.";
+      return;
+    }
+
+    if (rosterListener) {
+      rosterListener();
+    }
+
+    currentTeam = house;
+    gate.classList.add("hidden");
+    dashboard.classList.remove("hidden");
+    dashTitle.textContent = `${house.id} Roster`;
+    dashTitle.style.color = house.color;
+    startRosterListener();
+  });
+
+  document.getElementById("signout-btn").addEventListener("click", () => {
+    currentTeam = null;
+    teamPasscode.value = "";
+    teamSelect.value = "";
+    dashboard.classList.add("hidden");
+    gate.classList.remove("hidden");
+    if (rosterListener) {
+      rosterListener();
+      rosterListener = null;
+    }
+  });
+
+  function startRosterListener() {
+    rosterListener = listenParticipants((participants) => {
+      allParticipants = participants;
+      renderRoster();
+    });
+  }
+
+  function renderRoster() {
+    if (!currentTeam) return;
+    const mine = allParticipants
+      .filter((p) => p.team === currentTeam.id)
+      .sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+
+    const listEl = document.getElementById("roster-list");
+    if (mine.length === 0) {
+      listEl.innerHTML = `<div class="empty-state">No candidates registered yet.</div>`;
+      return;
+    }
+    listEl.innerHTML = mine
+      .map(
+        (p) => `
+        <div class="roster-row">
+          <div class="who">
+            <span>${p.name}</span>
+            <span class="code">${p.id}</span>
+          </div>
+          <span class="pts">${p.totalPoints || 0}</span>
+        </div>
+      `
+      )
+      .join("");
+  }
+
+  document.getElementById("register-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nameInput = document.getElementById("cand-name");
+    const codeInput = document.getElementById("cand-code");
+    const statusEl = document.getElementById("register-status");
+    statusEl.innerHTML = "";
+
+    try {
+      const code = await registerParticipant(codeInput.value, nameInput.value, currentTeam.id);
+      statusEl.innerHTML = `<div class="status-msg ok">Registered "${code}" to ${currentTeam.id}.</div>`;
+      nameInput.value = "";
+      codeInput.value = "";
+    } catch (err) {
+      statusEl.innerHTML = `<div class="status-msg err">${err.message}</div>`;
+    }
+  });
+</script>
+
+</body>
+</html>
