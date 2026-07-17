@@ -17,7 +17,7 @@ try {
 }
 
 // ---- Event Constants ----
-export const ADMIN_PASSWORD = "me";
+export const ADMIN_PASSWORD = "rescope-admin-2k26";
 
 export const HOUSES = [
   { id: "Horizon", label: "HORIZON", color: "#06AED5", passcode: "horizon26" },
@@ -102,6 +102,25 @@ export function listenPrograms(callback) {
   return () => supabase.removeChannel(channel);
 }
 
+// ---- Real-time Program Registration Sync ----
+export function listenRegistrations(callback) {
+  if (!supabase) return () => {};
+  const fetchRegistrations = async () => {
+    const { data, error } = await supabase.from("registrations").select("*");
+    if (error) console.error("Registrations fetch error:", error.message);
+    if (data) callback(data);
+  };
+
+  fetchRegistrations();
+
+  const channel = supabase
+    .channel("registrations-follow")
+    .on("postgres_changes", { event: "*", schema: "public", table: "registrations" }, fetchRegistrations)
+    .subscribe();
+
+  return () => supabase.removeChannel(channel);
+}
+
 // ---- Roster Registrations & Deletions ----
 export async function registerParticipant(code, name, teamId) {
   if (!supabase) throw new Error("Database client not connected.");
@@ -138,6 +157,33 @@ export async function deleteParticipant(code) {
 
   if (error) throw error;
   return cleanCode;
+}
+
+// ---- Program Registration Mapping ----
+export async function registerToProgram(programId, participantId) {
+  if (!supabase) throw new Error("Database client not connected.");
+  const { error } = await supabase.from("registrations").insert({
+    program_id: programId,
+    participant_id: participantId,
+  });
+
+  if (error) {
+    if (error.code === "23505") { // Unique key constraint violation
+      throw new Error("This candidate is already registered for this program.");
+    }
+    throw error;
+  }
+}
+
+export async function deregisterFromProgram(programId, participantId) {
+  if (!supabase) throw new Error("Database client not connected.");
+  const { error } = await supabase
+    .from("registrations")
+    .delete()
+    .eq("program_id", programId)
+    .eq("participant_id", participantId);
+
+  if (error) throw error;
 }
 
 // ---- Program Management ----
