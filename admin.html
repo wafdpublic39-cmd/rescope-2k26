@@ -3,28 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>RESCOPE 2K26 — Admin Control</title>
+<title>RESCOPE 2K26 — Admin</title>
 <link rel="stylesheet" href="style.css" />
-<style>
-  .admin-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 30px;
-    margin-top: 20px;
-  }
-  @media (max-width: 900px) {
-    .admin-grid { grid-template-columns: 1fr; }
-  }
-  .score-input-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-    background: var(--paper-off);
-    padding: 10px;
-    border: 1px solid var(--ink);
-  }
-</style>
 </head>
 <body>
 
@@ -39,243 +19,279 @@
   </div>
 </header>
 
-<main class="container">
-  <section class="section">
+<!-- ============ ADMIN PASSWORD GATE ============ -->
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <h2>Admin Access</h2>
+    <span class="sub">Master password required to open the command center.</span>
+    <div class="field">
+      <label for="admin-password">Master password</label>
+      <input type="password" id="admin-password" placeholder="Enter master password" />
+    </div>
+    <button class="btn btn-block" id="admin-login-btn">Unlock Dashboard</button>
+    <div class="error-text" id="gate-error"></div>
+  </div>
+</div>
+
+<!-- ============ ADMIN DASHBOARD ============ -->
+<main class="container hidden" id="dashboard">
+
+  <section class="section" style="border-bottom:none;padding-bottom:0;">
     <div class="section-head">
-      <h2>Admin Control Panel</h2>
-      <span class="ticker" id="db-status">● Offline</span>
+      <h2>Command Center</h2>
+      <button class="btn btn-outline" id="signout-btn">Lock Dashboard</button>
+    </div>
+  </section>
+
+  <!-- ---- Event Program Manager ---- -->
+  <section class="section two-col">
+    <div class="panel">
+      <h3 style="margin-bottom:18px;font-size:1.1rem;">Add Program</h3>
+      <form id="add-program-form">
+        <div class="field">
+          <label for="program-code">Program code</label>
+          <input type="text" id="program-code" placeholder="e.g. FA-01" required />
+        </div>
+        <div class="field">
+          <label for="program-title">Title</label>
+          <input type="text" id="program-title" placeholder="e.g. Solo Dance" required />
+        </div>
+        <div class="field">
+          <label for="program-category">Category</label>
+          <select id="program-category" required>
+            <option value="art">🎨 Arts Program</option>
+            <option value="sport">⚽ Sports Program</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-signal btn-block">Add Program</button>
+      </form>
+      <div id="add-program-status"></div>
     </div>
 
-    <div class="admin-grid">
-      <!-- COLUMN 1: Program Creator -->
-      <div class="panel">
-        <h3 style="margin-bottom: 15px;">Create New Program</h3>
-        <form id="program-form">
-          <div class="field">
-            <label for="prog-id">Program Code</label>
-            <input type="text" id="prog-id" placeholder="e.g. A01 or S01" required />
-          </div>
-          <div class="field">
-            <label for="prog-title">Program Title</label>
-            <input type="text" id="prog-title" placeholder="e.g. Oppana or Football" required />
-          </div>
-          <div class="field">
-            <label for="prog-category">Program Category</label>
-            <select id="prog-category" required>
-              <option value="art">🎨 Arts Program</option>
-              <option value="sport">⚽ Sports Program</option>
-            </select>
-          </div>
-          <button type="submit" class="btn btn-block">Add Program</button>
-        </form>
-        <div id="program-status" style="margin-top:10px;"></div>
-      </div>
+    <div class="panel">
+      <h3 style="margin-bottom:18px;font-size:1.1rem;">Existing Programs</h3>
+      <div id="program-list" style="max-height: 380px; overflow-y: auto;"></div>
+    </div>
+  </section>
 
-      <!-- COLUMN 2: Assign Scores / Results -->
-      <div class="panel">
-        <h3 style="margin-bottom: 15px;">Publish Event Scores</h3>
-        <form id="scoring-form">
+  <!-- ---- Points Ledger Adjuster ---- -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Points Ledger Adjuster</h2>
+      <span class="section-num">Auto-updates program · candidate · house</span>
+    </div>
+
+    <div class="panel">
+      <form id="ledger-form">
+        <div class="grid-2">
           <div class="field">
-            <label for="score-program-select">Select Program</label>
-            <select id="score-program-select" required>
+            <label for="ledger-program">Program</label>
+            <select id="ledger-program" required>
               <option value="">— Select program —</option>
             </select>
           </div>
-          
-          <div id="score-inputs-container">
-            <p style="font-size:0.85rem; color:#6b6b6b;">Select a program to allocate point scores to candidates.</p>
+          <div class="field">
+            <label for="ledger-code">Candidate code</label>
+            <input type="text" id="ledger-code" placeholder="e.g. HZ07" required />
           </div>
-          
-          <button type="button" id="add-score-row" class="btn btn-outline" style="margin-bottom:15px; display:none;">+ Add Row</button>
-          <button type="submit" id="save-scores-btn" class="btn btn-block btn-signal" style="display:none;">Publish Scores</button>
-        </form>
-        <div id="scoring-status" style="margin-top:10px;"></div>
-      </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label>Action</label>
+            <div class="segmented" id="action-toggle">
+              <button type="button" class="active add" data-action="add">Add</button>
+              <button type="button" class="subtract" data-action="subtract">Subtract</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="ledger-value">Point value</label>
+            <input type="number" id="ledger-value" min="1" step="1" placeholder="e.g. 10" required />
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-block">Submit Ledger Entry</button>
+      </form>
+      <div id="ledger-status"></div>
     </div>
   </section>
+
 </main>
 
-<footer>RESCOPE 2K26 · Admin Interface</footer>
+<footer>RESCOPE 2K26 · Horizon · Eclipse · Vector · Chroma</footer>
 
 <script type="module">
-  import { supabase, listenPrograms, listenParticipants } from "./firebase-config.js";
+  import {
+    ADMIN_PASSWORD,
+    addProgram,
+    deleteProgram,
+    awardPoints,
+    listenPrograms,
+  } from "./firebase-config.js";
 
-  const dbStatus = document.getElementById("db-status");
-  const programForm = document.getElementById("program-form");
-  const programStatus = document.getElementById("program-status");
-  
-  const scoreProgramSelect = document.getElementById("score-program-select");
-  const scoreInputsContainer = document.getElementById("score-inputs-container");
-  const addScoreRowBtn = document.getElementById("add-score-row");
-  const saveScoresBtn = document.getElementById("save-scores-btn");
-  const scoringForm = document.getElementById("scoring-form");
-  const scoringStatus = document.getElementById("scoring-status");
+  const gate = document.getElementById("gate");
+  const dashboard = document.getElementById("dashboard");
+  const gateError = document.getElementById("gate-error");
 
-  let allPrograms = [];
-  let allParticipants = [];
-
-  // Monitor Network
-  dbStatus.textContent = "● Connected to Supabase";
-  dbStatus.style.color = "#0B8457";
-
-  // Listen to active datasets
-  listenParticipants(parts => {
-    allParticipants = parts;
-  });
-
-  listenPrograms(progs => {
-    allPrograms = progs;
-    populateProgramDropdowns();
-  });
-
-  function populateProgramDropdowns() {
-    const currentSelection = scoreProgramSelect.value;
-    
-    // Group programs dynamically
-    const artPrograms = allPrograms.filter(p => (p.category || 'art') === 'art');
-    const sportPrograms = allPrograms.filter(p => p.category === 'sport');
-
-    const artOptions = artPrograms.map(p => `<option value="${p.id}">${p.id} — ${p.title}</option>`).join("");
-    const sportOptions = sportPrograms.map(p => `<option value="${p.id}">${p.id} — ${p.title}</option>`).join("");
-
-    scoreProgramSelect.innerHTML = `
-      <option value="">— Select program —</option>
-      ${artPrograms.length > 0 ? `<optgroup label="🎨 Arts Programs">${artOptions}</optgroup>` : ''}
-      ${sportPrograms.length > 0 ? `<optgroup label="⚽ Sports Programs">${sportOptions}</optgroup>` : ''}
-    `;
-
-    if (currentSelection) scoreProgramSelect.value = currentSelection;
-  }
-
-  // Handle Program Creation
-  programForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    programStatus.innerHTML = "";
-    
-    const id = document.getElementById("prog-id").value.trim().toUpperCase();
-    const title = document.getElementById("prog-title").value.trim();
-    const category = document.getElementById("prog-category").value;
-
-    try {
-      const { error } = await supabase.from("programs").insert([{
-        id,
-        title,
-        category,
-        scores: {}
-      }]);
-
-      if (error) throw error;
-
-      programStatus.innerHTML = `<div class="status-msg ok">Program "${title}" created successfully!</div>`;
-      programForm.reset();
-    } catch (err) {
-      programStatus.innerHTML = `<div class="status-msg err">Error: ${err.message}</div>`;
+  document.getElementById("admin-login-btn").addEventListener("click", () => {
+    const pw = document.getElementById("admin-password").value;
+    if (pw === ADMIN_PASSWORD) {
+      gate.classList.add("hidden");
+      dashboard.classList.remove("hidden");
+      gateError.textContent = "";
+      startProgramListener();
+    } else {
+      gateError.textContent = "Incorrect master password.";
     }
   });
 
-  // Handle Score Inputs rendering
-  scoreProgramSelect.addEventListener("change", () => {
-    const progId = scoreProgramSelect.value;
-    scoreInputsContainer.innerHTML = "";
-    
-    if (!progId) {
-      addScoreRowBtn.style.display = "none";
-      saveScoresBtn.style.display = "none";
+  document.getElementById("signout-btn").addEventListener("click", () => {
+    document.getElementById("admin-password").value = "";
+    dashboard.classList.add("hidden");
+    gate.classList.remove("hidden");
+  });
+
+  let programsData = [];
+  let programListenerStarted = false;
+
+  function startProgramListener() {
+    if (programListenerStarted) return;
+    programListenerStarted = true;
+    listenPrograms((programs) => {
+      programsData = programs.sort((a, b) => a.id.localeCompare(b.id));
+      renderProgramList();
+      renderLedgerProgramOptions();
+    });
+  }
+
+  function getProgramCategory(p) {
+    const cat = (p.category || p.type || '').toLowerCase();
+    if (cat.includes('art')) return 'art';
+    if (cat.includes('sport')) return 'sport';
+    return p.id.toLowerCase().startsWith('s') ? 'sport' : 'art';
+  }
+
+  function renderProgramList() {
+    const el = document.getElementById("program-list");
+    if (programsData.length === 0) {
+      el.innerHTML = `<div class="empty-state">No programs yet. Add one to get started.</div>`;
       return;
     }
 
-    addScoreRowBtn.style.display = "inline-block";
-    saveScoresBtn.style.display = "block";
+    const arts = programsData.filter(p => getProgramCategory(p) === 'art');
+    const sports = programsData.filter(p => getProgramCategory(p) === 'sport');
 
-    const program = allPrograms.find(p => p.id === progId);
-    const existingScores = program ? program.scores || {} : {};
-
-    if (Object.keys(existingScores).length === 0) {
-      addScoreInputRow("", "");
-    } else {
-      Object.entries(existingScores).forEach(([candidateCode, points]) => {
-        addScoreInputRow(candidateCode, points);
-      });
-    }
-  });
-
-  function addScoreInputRow(candidateCode = "", points = "") {
-    const row = document.createElement("div");
-    row.className = "score-input-row";
-    
-    row.innerHTML = `
-      <input type="text" placeholder="Cand. Code (e.g. HZ07)" value="${candidateCode}" class="cand-code-input" required style="flex:2;" />
-      <input type="number" placeholder="Points" value="${points}" class="cand-points-input" required style="flex:1;" />
-      <button type="button" class="btn btn-danger remove-row-btn" style="padding: 6px 12px;">X</button>
+    const formatRow = (p, label) => `
+      <div class="roster-row" style="margin-bottom: 6px;">
+        <div class="who">
+          <span>${p.title} <small style="font-size:0.7rem; color:#6b6b6b; font-weight:normal;">(${label})</small></span>
+          <span class="code">${p.id}</span>
+        </div>
+        <button class="btn btn-danger" data-delete="${p.id}" style="padding:8px 12px;font-size:0.72rem;">Delete</button>
+      </div>
     `;
 
-    row.querySelector(".remove-row-btn").addEventListener("click", () => row.remove());
-    scoreInputsContainer.appendChild(row);
-  }
+    el.innerHTML = `
+      <div style="font-family:var(--font-mono); font-weight:800; font-size:0.85rem; margin-bottom:10px; border-bottom:1px solid #111; padding-bottom:4px;">🎨 Arts Category</div>
+      ${arts.length ? arts.map(p => formatRow(p, 'Art')).join("") : '<div class="empty-state" style="padding:10px; margin-bottom:15px;">No Arts Programs</div>'}
+      
+      <div style="font-family:var(--font-mono); font-weight:800; font-size:0.85rem; margin-top:20px; margin-bottom:10px; border-bottom:1px solid #111; padding-bottom:4px;">⚽ Sports Category</div>
+      ${sports.length ? sports.map(p => formatRow(p, 'Sport')).join("") : '<div class="empty-state" style="padding:10px;">No Sports Programs</div>'}
+    `;
 
-  addScoreRowBtn.addEventListener("click", () => addScoreInputRow("", ""));
-
-  // Submit and update scores
-  scoringForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    scoringStatus.innerHTML = "";
-    
-    const progId = scoreProgramSelect.value;
-    const rows = scoreInputsContainer.querySelectorAll(".score-input-row");
-    
-    const scores = {};
-    rows.forEach(row => {
-      const code = row.querySelector(".cand-code-input").value.trim().toUpperCase();
-      const points = parseInt(row.querySelector(".cand-points-input").value) || 0;
-      if (code) scores[code] = points;
-    });
-
-    try {
-      // 1. Update program scores
-      const { error: progErr } = await supabase.from("programs").update({ scores }).eq("id", progId);
-      if (progErr) throw progErr;
-
-      // 2. Recalculate candidate total scores
-      await recalculatePoints();
-
-      scoringStatus.innerHTML = `<div class="status-msg ok">Scores successfully published!</div>`;
-    } catch (err) {
-      scoringStatus.innerHTML = `<div class="status-msg err">Error: ${err.message}</div>`;
-    }
-  });
-
-  // Self-healing score compiler
-  async function recalculatePoints() {
-    const participantTotals = {};
-    const houseTotals = { Horizon: 0, Eclipse: 0, Vector: 0, Chroma: 0 };
-
-    const { data: progs } = await supabase.from("programs").select("*");
-    const { data: parts } = await supabase.from("participants").select("*");
-
-    parts.forEach(p => { participantTotals[p.id] = 0; });
-
-    progs.forEach(p => {
-      Object.entries(p.scores || {}).forEach(([code, pts]) => {
-        if (participantTotals[code] !== undefined) {
-          participantTotals[code] += Number(pts);
-        }
-        const candidateObj = parts.find(part => part.id === code);
-        if (candidateObj && houseTotals[candidateObj.team] !== undefined) {
-          houseTotals[candidateObj.team] += Number(pts);
+    el.querySelectorAll("[data-delete]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm(`Delete program "${btn.dataset.delete}"? This cannot be undone.`)) return;
+        try {
+          await deleteProgram(btn.dataset.delete);
+        } catch (err) {
+          alert(err.message);
         }
       });
     });
-
-    // Bulk update participants
-    for (const [id, totalPoints] of Object.entries(participantTotals)) {
-      await supabase.from("participants").update({ totalPoints }).eq("id", id);
-    }
-
-    // Bulk update house scores
-    for (const [id, totalPoints] of Object.entries(houseTotals)) {
-      await supabase.from("teams").update({ totalPoints }).eq("id", id);
-    }
   }
+
+  function renderLedgerProgramOptions() {
+    const select = document.getElementById("ledger-program");
+    const current = select.value;
+
+    const arts = programsData.filter(p => getProgramCategory(p) === 'art');
+    const sports = programsData.filter(p => getProgramCategory(p) === 'sport');
+
+    const artOptions = arts.map((p) => `<option value="${p.id}">${p.id} — ${p.title}</option>`).join("");
+    const sportOptions = sports.map((p) => `<option value="${p.id}">${p.id} — ${p.title}</option>`).join("");
+
+    select.innerHTML = `
+      <option value="">— Select program —</option>
+      ${arts.length ? `<optgroup label="🎨 Arts Programs">${artOptions}</optgroup>` : ''}
+      ${sports.length ? `<optgroup label="⚽ Sports Programs">${sportOptions}</optgroup>` : ''}
+    `;
+    if (current) select.value = current;
+  }
+
+  document.getElementById("add-program-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const codeInput = document.getElementById("program-code");
+    const titleInput = document.getElementById("program-title");
+    const categoryInput = document.getElementById("program-category");
+    const statusEl = document.getElementById("add-program-status");
+    statusEl.innerHTML = "";
+    try {
+      // Passes the category value along to the data adapter
+      const code = await addProgram(codeInput.value, titleInput.value, categoryInput.value);
+      statusEl.innerHTML = `<div class="status-msg ok">Program "${code}" added successfully.</div>`;
+      codeInput.value = "";
+      titleInput.value = "";
+    } catch (err) {
+      statusEl.innerHTML = `<div class="status-msg err">${err.message}</div>`;
+    }
+  });
+
+  // ---- Ledger action toggle ----
+  let currentAction = "add";
+  document.querySelectorAll("#action-toggle button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#action-toggle button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentAction = btn.dataset.action;
+    });
+  });
+
+  document.getElementById("ledger-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const programCode = document.getElementById("ledger-program").value;
+    const candidateCode = document.getElementById("ledger-code").value;
+    const rawValue = Number(document.getElementById("ledger-value").value);
+    const statusEl = document.getElementById("ledger-status");
+    statusEl.innerHTML = "";
+
+    if (!programCode) {
+      statusEl.innerHTML = `<div class="status-msg err">Select a program first.</div>`;
+      return;
+    }
+    if (!candidateCode.trim()) {
+      statusEl.innerHTML = `<div class="status-msg err">Enter a candidate code.</div>`;
+      return;
+    }
+    if (!rawValue || rawValue <= 0) {
+      statusEl.innerHTML = `<div class="status-msg err">Enter a positive point value.</div>`;
+      return;
+    }
+
+    const delta = currentAction === "add" ? rawValue : -rawValue;
+
+    try {
+      const result = await awardPoints(programCode, candidateCode, delta);
+      statusEl.innerHTML = `<div class="status-msg ok">
+        ${currentAction === "add" ? "Added" : "Subtracted"} ${rawValue} pt(s) for ${candidateCode.toUpperCase()} in ${programCode.toUpperCase()}.
+        New program score: ${result.newProgramScore} · New candidate total: ${result.newParticipantTotal}.
+      </div>`;
+      document.getElementById("ledger-code").value = "";
+      document.getElementById("ledger-value").value = "";
+    } catch (err) {
+      statusEl.innerHTML = `<div class="status-msg err">${err.message}</div>`;
+    }
+  });
 </script>
 
 </body>
