@@ -209,14 +209,25 @@
 
     renderCandidatesManagement();
     renderEnrollmentsManagement();
-    renderLedgerCandidateOptions(); // Updates ledger candidates dropdown
+    renderLedgerCandidateOptions();
   }
 
+  // FIXED: Bulletproof engine to prevent Arts and Sports from mixing
   function getProgramCategory(p) {
-    const cat = (p.category || p.type || '').toLowerCase();
-    if (cat.includes('art')) return 'art';
+    if (!p) return 'art';
+    
+    // 1. Explicitly check database property variants
+    const cat = String(p.category || p.type || p.category_id || p.program_category || '').toLowerCase().trim();
     if (cat.includes('sport')) return 'sport';
-    return p.id.toLowerCase().startsWith('s') ? 'sport' : 'art';
+    if (cat.includes('art')) return 'art';
+    
+    // 2. Fallback prefix mapping if property mapping falls through
+    const code = String(p.id || '').toLowerCase().trim();
+    if (code.startsWith('s') || code.startsWith('fb') || code.startsWith('bb') || code.startsWith('at')) {
+      return 'sport';
+    }
+    
+    return 'art';
   }
 
   function renderProgramList() {
