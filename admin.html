@@ -42,54 +42,7 @@
       <button class="btn btn-outline" id="signout-btn">Lock Dashboard</button>
     </div>
   </section>
-</main>
 
-<footer>RESCOPE 2K26 · Horizon · Eclipse · Vector · Chroma</footer>
-
-<script type="module">
-  import {
-    getAdminPassword, // <-- Imported the new function
-    addProgram,
-    deleteProgram,
-    awardPoints,
-    listenPrograms,
-    supabase
-  } from "./firebase-config.js";
-
-  const gate = document.getElementById("gate");
-  const dashboard = document.getElementById("dashboard");
-  const gateError = document.getElementById("gate-error");
-
-  // Changed to async to handle the database fetch
-  document.getElementById("admin-login-btn").addEventListener("click", async () => {
-    const pw = document.getElementById("admin-password").value;
-    gateError.textContent = "Checking password...";
-    
-    try {
-      const storedPassword = await getAdminPassword(); // Fetching from Supabase
-      if (pw === storedPassword) {
-        gate.classList.add("hidden");
-        dashboard.classList.remove("hidden");
-        gateError.textContent = "";
-        startProgramListener();
-        startManagementRealtime();
-      } else {
-        gateError.textContent = "Incorrect master password.";
-      }
-    } catch (err) {
-      gateError.textContent = "Error: Could not verify password.";
-      console.error(err);
-    }
-  });
-
-  document.getElementById("signout-btn").addEventListener("click", () => {
-    document.getElementById("admin-password").value = "";
-    dashboard.classList.add("hidden");
-    gate.classList.remove("hidden");
-  });
-
-  // ... (Keep the rest of your existing JavaScript functions exactly as they are)
-</script>
   <!-- ---- Event Program Manager ---- -->
   <section class="section two-col">
     <div class="panel">
