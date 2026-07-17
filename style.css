@@ -51,11 +51,11 @@ html, body {
   margin: 0;
   padding: 0;
   /* This creates the watermark effect */
-  background: linear-gradient(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.95)), url('RESCOPE LOGO.jpg');
+  background: linear-gradient(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.95)), url('RESCOPE LOGO.png');
   background-repeat: no-repeat;
   background-position: center;
   background-attachment: fixed;
-  background-size: 40%;
+  background-size: 35%;
   
   color: var(--ink);
   font-family: var(--font-body);
