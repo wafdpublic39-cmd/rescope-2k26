@@ -5,6 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>RESCOPE 2K26 — Team Access</title>
 <link rel="stylesheet" href="style.css" />
+<style>
+  /* Category filter button styles */
+  .filter-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .filter-tab {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    font-family: var(--font-mono, monospace);
+    font-weight: 700;
+    cursor: pointer;
+    background: var(--paper, #fff);
+    border: 1px solid var(--ink, #111);
+    transition: all 0.1s ease;
+  }
+  .filter-tab.active {
+    background: var(--ink, #111);
+    color: var(--paper, #fff);
+  }
+</style>
 </head>
 <body>
 
@@ -46,7 +68,7 @@
   </div>
 </div>
 
-<!-- ============ ROSTER DASHBOARD ============ -->
+<!-- ============ ROSTER & PROGRAM DASHBOARD ============ -->
 <main class="container hidden" id="dashboard">
 
   <section class="section" style="border-bottom:none;padding-bottom:0;">
@@ -56,6 +78,7 @@
     </div>
   </section>
 
+  <!-- ---- Candidate Registration Panel ---- -->
   <section class="section two-col" style="border-bottom:1px solid #111; padding-bottom:25px;">
     <div class="panel">
       <h3 style="margin-bottom:18px;font-size:1.1rem;">Register a Candidate</h3>
@@ -79,26 +102,46 @@
     </div>
   </section>
 
-  <!-- ---- Divided Category Program Trackers ---- -->
-  <section class="section">
-    <div class="section-head">
-      <h2>Festival Categories</h2>
-      <span class="section-num">Divided Overview</span>
-    </div>
-    
-    <div class="two-col">
-      <div class="panel">
-        <h3 style="margin-bottom:15px; font-size:1rem; color:#111; border-bottom: 2px solid #111; padding-bottom:6px;">🎨 Arts Category Programs</h3>
-        <div id="arts-programs-box" style="max-height: 250px; overflow-y: auto;">
-          <div class="empty-state">Loading category events...</div>
+  <!-- ---- Team Program Enrollment Engine ---- -->
+  <section class="section two-col">
+    <div class="panel">
+      <h3 style="margin-bottom:18px;font-size:1.1rem;">Enroll in Program</h3>
+      <p style="font-size: 0.85rem; color: #6b6b6b; margin-bottom: 16px;">
+        Add your registered house candidates to programs.
+      </p>
+
+      <!-- Category Filter Tabs for Teams -->
+      <div class="field" style="margin-bottom: 10px;">
+        <label>Filter Programs by Category</label>
+        <div class="filter-tabs">
+          <span class="filter-tab active" data-filter="all">All</span>
+          <span class="filter-tab" data-filter="art">🎨 Arts</span>
+          <span class="filter-tab" data-filter="sport">⚽ Sports</span>
         </div>
       </div>
-      
-      <div class="panel">
-        <h3 style="margin-bottom:15px; font-size:1rem; color:#111; border-bottom: 2px solid #111; padding-bottom:6px;">⚽ Sports Category Programs</h3>
-        <div id="sports-programs-box" style="max-height: 250px; overflow-y: auto;">
-          <div class="empty-state">Loading category events...</div>
+
+      <form id="program-enroll-form">
+        <div class="field">
+          <label for="enroll-candidate">Select Candidate</label>
+          <select id="enroll-candidate" required>
+            <option value="">— Select house candidate —</option>
+          </select>
         </div>
+        <div class="field">
+          <label for="enroll-program">Select Program</label>
+          <select id="enroll-program" required>
+            <option value="">— Select program —</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-signal btn-block">Register for Program</button>
+      </form>
+      <div id="enroll-status"></div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-bottom:18px;font-size:1.1rem;">Active Program Enrollments</h3>
+      <div id="enrollments-list" style="max-height: 290px; overflow-y: auto;">
+        <div class="empty-state">No enrollments added yet.</div>
       </div>
     </div>
   </section>
@@ -113,7 +156,8 @@
     registerParticipant, 
     listenParticipants, 
     houseById, 
-    listenPrograms 
+    listenPrograms,
+    supabase 
   } from "./firebase-config.js";
 
   const gate = document.getElementById("gate");
@@ -125,8 +169,13 @@
 
   let currentTeam = null;
   let allParticipants = [];
+  let allPrograms = [];
+  let allRegistrations = [];
+  let currentFilter = "all";
+
   let rosterListener = null;
   let programListener = null;
+  let registrationsSubscription = null;
 
   document.getElementById("team-login-btn").addEventListener("click", () => {
     const teamId = teamSelect.value;
@@ -143,8 +192,7 @@
       return;
     }
 
-    if (rosterListener) rosterListener();
-    if (programListener) programListener();
+    cleanUpListeners();
 
     currentTeam = house;
     gate.classList.add("hidden");
@@ -153,7 +201,7 @@
     dashTitle.style.color = house.color;
     
     startRosterListener();
-    startProgramCategoryListener();
+    startProgramAndEnrollmentSync();
   });
 
   document.getElementById("signout-btn").addEventListener("click", () => {
@@ -162,48 +210,78 @@
     teamSelect.value = "";
     dashboard.classList.add("hidden");
     gate.classList.remove("hidden");
+    cleanUpListeners();
+  });
+
+  function cleanUpListeners() {
     if (rosterListener) { rosterListener(); rosterListener = null; }
     if (programListener) { programListener(); programListener = null; }
-  });
+    if (registrationsSubscription) { registrationsSubscription.unsubscribe(); registrationsSubscription = null; }
+  }
 
   function startRosterListener() {
     rosterListener = listenParticipants((participants) => {
       allParticipants = participants;
       renderRoster();
+      populateCandidateDropdown();
+      renderEnrollments();
     });
   }
 
-  function startProgramCategoryListener() {
-    const artsBox = document.getElementById("arts-programs-box");
-    const sportsBox = document.getElementById("sports-programs-box");
-
+  function startProgramAndEnrollmentSync() {
     programListener = listenPrograms((programs) => {
-      const sorted = (programs || []).sort((a, b) => a.id.localeCompare(b.id));
-      
-      const getCategory = (p) => {
-        const cat = (p.category || p.type || '').toLowerCase();
-        if (cat.includes('art')) return 'art';
-        if (cat.includes('sport')) return 'sport';
-        return p.id.toLowerCase().startsWith('s') ? 'sport' : 'art';
-      };
-
-      const artsList = sorted.filter(p => getCategory(p) === 'art');
-      const sportsList = sorted.filter(p => getCategory(p) === 'sport');
-
-      const formatMiniRow = (p) => `
-        <div class="roster-row" style="padding: 6px 8px; font-size:0.85rem; margin-bottom:4px; background:var(--paper-off);">
-          <div class="who"><strong>${p.id}</strong> — ${p.title}</div>
-        </div>
-      `;
-
-      artsBox.innerHTML = artsList.length 
-        ? artsList.map(formatMiniRow).join("") 
-        : '<div class="empty-state">No Arts programs added.</div>';
-
-      sportsBox.innerHTML = sportsList.length 
-        ? sportsList.map(formatMiniRow).join("") 
-        : '<div class="empty-state">No Sports programs added.</div>';
+      allPrograms = (programs || []).sort((a, b) => a.id.localeCompare(b.id));
+      populateProgramDropdown();
+      renderEnrollments();
     });
+
+    registrationsSubscription = supabase.channel('public:registrations_teams').on('postgres_changes', { event: '*', schema: 'public', table: 'registrations' }, () => {
+      syncRegistrations();
+    }).subscribe();
+
+    syncRegistrations();
+  }
+
+  async function syncRegistrations() {
+    const { data } = await supabase.from("registrations").select("*");
+    if (data) {
+      allRegistrations = data;
+      renderEnrollments();
+    }
+  }
+
+  // UPDATED ENGINE: Explicitly scans for sports keywords to prevent misclassification
+  function getProgramCategory(p) {
+    if (!p) return 'art';
+    
+    const sportsKeywords = [
+      'sport', 'sports', 'wrestling', 'wrestle', 'football', 'cricket', 
+      'volleyball', 'basketball', 'badminton', 'tennis', 'kabaddi', 
+      'athletics', 'race', 'running', 'chess', 'carrom', 'tug of war', 'match'
+    ];
+
+    for (const key in p) {
+      if (Object.prototype.hasOwnProperty.call(p, key)) {
+        const val = p[key];
+        if (typeof val === 'string') {
+          const s = val.toLowerCase().trim();
+          if (s === 'sport' || s === 'sports') return 'sport';
+          if (sportsKeywords.some(kw => s.includes(kw))) {
+            return 'sport';
+          }
+        }
+        if (typeof val === 'boolean' && val === true && key.toLowerCase().includes('sport')) {
+          return 'sport';
+        }
+      }
+    }
+    
+    const code = String(p.id || '').toLowerCase().trim();
+    if (code.startsWith('s') || code.startsWith('fb') || code.startsWith('bb') || code.startsWith('at') || code.includes('sport')) {
+      return 'sport';
+    }
+    
+    return 'art';
   }
 
   function renderRoster() {
@@ -218,8 +296,7 @@
       return;
     }
     listEl.innerHTML = mine
-      .map(
-        (p) => `
+      .map((p) => `
         <div class="roster-row">
           <div class="who">
             <span>${p.name}</span>
@@ -227,9 +304,115 @@
           </div>
           <span class="pts">${p.totalPoints || 0}</span>
         </div>
-      `
-      )
+      `)
       .join("");
+  }
+
+  function populateCandidateDropdown() {
+    const select = document.getElementById("enroll-candidate");
+    const current = select.value;
+    if (!currentTeam) return;
+
+    const mine = allParticipants
+      .filter((p) => p.team === currentTeam.id)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    select.innerHTML =
+      `<option value="">— Select house candidate —</option>` +
+      mine.map((p) => `<option value="${p.id}">${p.name} (${p.id})</option>`).join("");
+
+    if (current && mine.some(p => p.id === current)) {
+      select.value = current;
+    }
+  }
+
+  function populateProgramDropdown() {
+    const select = document.getElementById("enroll-program");
+    const current = select.value;
+
+    const filteredPrograms = allPrograms.filter(p => {
+      if (currentFilter === "all") return true;
+      return getProgramCategory(p) === currentFilter;
+    });
+
+    const arts = filteredPrograms.filter(p => getProgramCategory(p) === 'art');
+    const sports = filteredPrograms.filter(p => getProgramCategory(p) === 'sport');
+
+    const artOptions = arts.map((p) => `<option value="${p.id}">${p.id} — ${p.title}</option>`).join("");
+    const sportOptions = sports.map((p) => `<option value="${p.id}">${p.id} — ${p.title}</option>`).join("");
+
+    select.innerHTML = `
+      <option value="">— Select program —</option>
+      ${arts.length ? `<optgroup label="🎨 Arts Programs">${artOptions}</optgroup>` : ''}
+      ${sports.length ? `<optgroup label="⚽ Sports Programs">${sportOptions}</optgroup>` : ''}
+    `;
+
+    if (current && filteredPrograms.some(p => p.id === current)) {
+      select.value = current;
+    }
+  }
+
+  // Segmented Program Tab Listeners
+  document.querySelectorAll(".filter-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".filter-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      currentFilter = tab.getAttribute("data-filter");
+      populateProgramDropdown();
+    });
+  });
+
+  function renderEnrollments() {
+    if (!currentTeam) return;
+    const listEl = document.getElementById("enrollments-list");
+
+    const myParticipantsIds = new Set(
+      allParticipants
+        .filter((p) => p.team === currentTeam.id)
+        .map((p) => p.id)
+    );
+
+    const mine = allRegistrations.filter((reg) => myParticipantsIds.has(reg.participant_id));
+
+    if (mine.length === 0) {
+      listEl.innerHTML = `<div class="empty-state">No program enrollments registered yet.</div>`;
+      return;
+    }
+
+    listEl.innerHTML = mine
+      .map((reg) => {
+        const participant = allParticipants.find((p) => p.id === reg.participant_id) || { name: reg.participant_id };
+        const program = allPrograms.find((pg) => pg.id === reg.program_id) || { title: reg.program_id };
+        const catIcon = getProgramCategory(program) === 'art' ? '🎨' : '⚽';
+        return `
+          <div class="roster-row" style="margin-bottom: 8px;">
+            <div class="who">
+              <span>${participant.name} <span class="code" style="font-size: 0.72rem;">(${reg.participant_id})</span></span>
+              <span style="font-size:0.78rem; color:#6b6b6b; display: block; margin-top: 3px;">
+                ${catIcon} Enrolled: <b>${program.title}</b> (${reg.program_id})
+              </span>
+            </div>
+            <button class="btn btn-danger" data-dereg-program="${reg.program_id}" data-dereg-participant="${reg.participant_id}" style="padding: 6px 12px; font-size: 0.72rem;">Remove</button>
+          </div>
+        `;
+      })
+      .join("");
+
+    listEl.querySelectorAll("[data-dereg-program]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const progId = btn.getAttribute("data-dereg-program");
+        const partId = btn.getAttribute("data-dereg-participant");
+        if (!confirm(`Cancel enrollment for this candidate?`)) return;
+
+        try {
+          const { error } = await supabase.from("registrations").delete().eq("program_id", progId).eq("participant_id", partId);
+          if (error) throw error;
+          syncRegistrations();
+        } catch (err) {
+          alert("Error: " + err.message);
+        }
+      });
+    });
   }
 
   document.getElementById("register-form").addEventListener("submit", async (e) => {
@@ -244,6 +427,29 @@
       statusEl.innerHTML = `<div class="status-msg ok">Registered "${code}" to ${currentTeam.id}.</div>`;
       nameInput.value = "";
       codeInput.value = "";
+    } catch (err) {
+      statusEl.innerHTML = `<div class="status-msg err">${err.message}</div>`;
+    }
+  });
+
+  document.getElementById("program-enroll-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const candSelect = document.getElementById("enroll-candidate");
+    const progSelect = document.getElementById("enroll-program");
+    const statusEl = document.getElementById("enroll-status");
+    statusEl.innerHTML = "";
+
+    const candId = candSelect.value;
+    const progId = progSelect.value;
+
+    try {
+      const { error } = await supabase.from("registrations").insert([{ program_id: progId, participant_id: candId }]);
+      if (error) throw error;
+
+      statusEl.innerHTML = `<div class="status-msg ok">Candidate successfully enrolled!</div>`;
+      syncRegistrations();
+      candSelect.value = "";
+      progSelect.value = "";
     } catch (err) {
       statusEl.innerHTML = `<div class="status-msg err">${err.message}</div>`;
     }
