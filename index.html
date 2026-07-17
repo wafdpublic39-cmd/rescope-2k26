@@ -5,6 +5,114 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>RESCOPE 2K26 — Live Standings</title>
 <link rel="stylesheet" href="style.css" />
+<style>
+  /* Neo-brutalist Segmented Tabs */
+  .tab-control {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+  }
+  .tab-btn {
+    background: var(--paper, #fff);
+    border: var(--border-w, 2px) solid var(--ink, #111);
+    padding: 8px 18px;
+    font-family: var(--font-mono, monospace);
+    font-weight: 800;
+    font-size: 0.9rem;
+    cursor: pointer;
+    box-shadow: 3px 3px 0px var(--ink, #111);
+    transition: all 0.1s ease;
+  }
+  .tab-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0px var(--ink, #111);
+  }
+  .tab-btn.active {
+    background: var(--ink, #111);
+    color: var(--paper, #fff);
+    box-shadow: none;
+    transform: none;
+  }
+
+  /* Two column enrollments split */
+  .enrollments-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+  }
+  @media (max-width: 900px) {
+    .enrollments-split {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .sub-header {
+    font-family: var(--font-mono, monospace);
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: var(--border-w, 2px) solid var(--ink, #111);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Styling for the Program Enrollments Grid & Chips */
+  .program-chips-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  .program-enrollment-card {
+    background: var(--paper, #fff);
+    border: var(--border-w, 2px) solid var(--ink, #111);
+    padding: 18px;
+    box-shadow: 4px 4px 0px var(--ink, #111);
+  }
+  .enrollment-title-bar {
+    font-family: var(--font-mono, monospace);
+    font-weight: 800;
+    font-size: 1.05rem;
+    border-bottom: 1px solid var(--ink, #111);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .enrollment-code {
+    font-size: 0.72rem;
+    background: var(--paper-off, #f5f5f5);
+    border: 1px solid var(--ink, #111);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: normal;
+  }
+  .chips-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .candidate-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--paper-off, #f5f5f5);
+    border: 1px solid var(--ink, #111);
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .chip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.2);
+  }
+</style>
 </head>
 <body>
 
@@ -35,6 +143,14 @@
       <h2>House Standings</h2>
       <span class="section-num">01 — Live</span>
     </div>
+
+    <!-- Interactive Neo-brutalist Tab Toggles -->
+    <div class="tab-control">
+      <button class="tab-btn active" data-tab="total">🏆 Total Standings</button>
+      <button class="tab-btn" data-tab="art">🎨 Arts Standings</button>
+      <button class="tab-btn" data-tab="sport">⚽ Sports Standings</button>
+    </div>
+
     <div class="scoreboard" id="scoreboard">
       <!-- team cards injected here -->
     </div>
@@ -78,6 +194,38 @@
     </div>
   </section>
 
+  <!-- ============ ACTIVE PROGRAM ENROLLMENTS ============ -->
+  <section class="section" id="enrollments">
+    <div class="section-head">
+      <h2>Active Program Enrollments</h2>
+      <span class="section-num">04 — Enrollments</span>
+    </div>
+
+    <div class="panel">
+      <p style="font-size: 0.95rem; color: #6b6b6b; margin-bottom: 25px;">
+        Explore registered team candidates dynamically matched to the programs published by the admin, split cleanly between Arts and Sports.
+      </p>
+      
+      <div class="enrollments-split">
+        <!-- Arts Column -->
+        <div>
+          <div class="sub-header">🎨 Arts Enrollments</div>
+          <div class="program-chips-grid" id="arts-enrollments-container">
+            <div class="empty-state">No Arts programs added yet.</div>
+          </div>
+        </div>
+
+        <!-- Sports Column -->
+        <div>
+          <div class="sub-header">⚽ Sports Enrollments</div>
+          <div class="program-chips-grid" id="sports-enrollments-container">
+            <div class="empty-state">No Sports programs added yet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <footer>RESCOPE 2K26 · Horizon · Eclipse · Vector · Chroma</footer>
@@ -88,14 +236,17 @@
     listenTeams,
     listenParticipants,
     listenPrograms,
+    listenRegistrations,
     houseById,
   } from "./firebase-config.js";
 
   let teamsData = [];
   let participantsData = [];
   let programsData = [];
+  let registrationsData = [];
   let prevScores = {};
   let currentLookupCode = "";
+  let activeTab = "total"; // Active scoreboard view state: 'total' | 'art' | 'sport'
 
   try {
     await seedTeamsIfEmpty();
@@ -103,32 +254,114 @@
     console.warn("Seeding bypassed:", e.message);
   }
 
-  // ---------- Standings ----------
+  // ---------- Category Detection Helper ----------
+  // Safely checks categories based on program values or prefixed program codes (A01 vs S01)
+  function getProgramCategory(p) {
+    const cat = (p.category || p.type || '').toLowerCase();
+    if (cat.includes('art')) return 'art';
+    if (cat.includes('sport')) return 'sport';
+    
+    const id = (p.id || '').toLowerCase();
+    if (id.startsWith('a')) return 'art';
+    if (id.startsWith('s')) return 'sport';
+    return 'art'; // Default fallback
+  }
+
+  // ---------- Standings Points Compiler ----------
+  // Computes art and sport splits dynamically from individual program results,
+  // falling back safely to columns if already loaded on the database.
+  function getHousePoints(teamId) {
+    const computed = { art: 0, sport: 0, total: 0 };
+
+    programsData.forEach(p => {
+      const cat = getProgramCategory(p);
+      const scores = p.scores || {};
+      Object.entries(scores).forEach(([partCode, points]) => {
+        const participant = participantsData.find(part => part.id === partCode);
+        if (participant && participant.team === teamId) {
+          const ptsValue = Number(points) || 0;
+          computed[cat] += ptsValue;
+          computed.total += ptsValue;
+        }
+      });
+    });
+
+    const dbTeam = teamsData.find(t => t.id === teamId);
+    if (!dbTeam) return computed;
+
+    // Use DB data if custom columns exist; fallback to computed splits
+    const artPts = dbTeam.artsPoints !== undefined ? dbTeam.artsPoints : (dbTeam.artPoints !== undefined ? dbTeam.artPoints : computed.art);
+    const sportPts = dbTeam.sportsPoints !== undefined ? dbTeam.sportsPoints : (dbTeam.sportPoints !== undefined ? dbTeam.sportPoints : computed.sport);
+    const totalPts = dbTeam.totalPoints !== undefined ? dbTeam.totalPoints : (artPts + sportPts);
+
+    return {
+      art: artPts,
+      sport: sportPts,
+      total: totalPts
+    };
+  }
+
+  // ---------- Live Scoreboard Renderer ----------
   const scoreboardEl = document.getElementById("scoreboard");
 
-  function renderScoreboard(teams) {
-    const sorted = [...teams].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
-    scoreboardEl.innerHTML = sorted
+  function renderScoreboard() {
+    if (teamsData.length === 0) {
+      scoreboardEl.innerHTML = `<div class="empty-state">Loading live standings...</div>`;
+      return;
+    }
+
+    const mappedTeams = teamsData.map(team => {
+      const pts = getHousePoints(team.id);
+      return {
+        id: team.id,
+        points: pts[activeTab], // Score corresponding to current active tab
+        art: pts.art,
+        sport: pts.sport,
+        total: pts.total
+      };
+    });
+
+    // Sort descending by points of the selected category
+    mappedTeams.sort((a, b) => b.points - a.points);
+
+    scoreboardEl.innerHTML = mappedTeams
       .map((team, i) => {
         const house = houseById(team.id) || { color: "#111" };
-        const bumped = prevScores[team.id] !== undefined && prevScores[team.id] !== team.totalPoints;
+        const bumped = prevScores[team.id] !== undefined && prevScores[team.id] !== team.points;
         return `
           <div class="team-card" style="--house-color:${house.color}">
             <div class="stripe"></div>
             <div class="rank">RANK ${i + 1}</div>
             <h3><span class="swatch"></span>${team.id}</h3>
-            <div class="score ${bumped ? "bump" : ""}">${team.totalPoints || 0}</div>
-            <div class="score-label">Total Points</div>
+            <div class="score ${bumped ? "bump" : ""}">${team.points}</div>
+            <div class="score-label" style="text-transform: uppercase;">${activeTab} Points</div>
+            <div style="margin-top: 15px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,0.15); font-size: 0.8rem; color: #555; display: flex; justify-content: space-between;">
+              <span>🎨 Art: <b>${team.art}</b></span>
+              <span>⚽ Sport: <b>${team.sport}</b></span>
+              <span>🏆 Total: <b>${team.total}</b></span>
+            </div>
           </div>
         `;
       })
       .join("");
-    teams.forEach((t) => (prevScores[t.id] = t.totalPoints));
+
+    // Cache to check for bump transition effects
+    mappedTeams.forEach((t) => (prevScores[t.id] = t.points));
   }
+
+  // Wire up Tab Toggles
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      activeTab = btn.getAttribute("data-tab");
+      renderScoreboard();
+    });
+  });
 
   listenTeams((teams) => {
     teamsData = teams;
-    renderScoreboard(teams);
+    renderScoreboard();
   });
 
   // ---------- Program Results Room ----------
@@ -186,7 +419,60 @@
     `;
   }
 
-  // Reactive dependency mapping to prevent dashboard render lag
+  // ---------- Active Program Enrollments Renderer ----------
+  const artsEnrollmentsContainer = document.getElementById("arts-enrollments-container");
+  const sportsEnrollmentsContainer = document.getElementById("sports-enrollments-container");
+
+  function renderProgramEnrollments() {
+    if (!artsEnrollmentsContainer || !sportsEnrollmentsContainer) return;
+
+    const artPrograms = programsData.filter(p => getProgramCategory(p) === 'art');
+    const sportPrograms = programsData.filter(p => getProgramCategory(p) === 'sport');
+
+    function buildCardsHtml(programsList) {
+      if (programsList.length === 0) {
+        return `<div class="empty-state">No active programs.</div>`;
+      }
+      return programsList
+        .map((prog) => {
+          const matches = registrationsData.filter((r) => r.program_id === prog.id);
+          const chipsHtml = matches
+            .map((reg) => {
+              const participant = participantsData.find((p) => p.id === reg.participant_id);
+              if (!participant) return "";
+              const house = houseById(participant.team) || { color: "#6b6b6b" };
+              return `
+                <span class="candidate-chip" title="House: ${participant.team}">
+                  <span class="chip-dot" style="background-color: ${house.color}"></span>
+                  <span>${participant.name} <span style="font-family: var(--font-mono, monospace); font-size: 0.72rem; color: #6b6b6b;">(${participant.id})</span></span>
+                </span>
+              `;
+            })
+            .filter(Boolean)
+            .join("");
+
+          return `
+            <div class="program-enrollment-card">
+              <div>
+                <div class="enrollment-title-bar">
+                  <span>${prog.title}</span>
+                  <span class="enrollment-code">${prog.id}</span>
+                </div>
+                <div class="chips-wrap">
+                  ${chipsHtml || `<span style="font-size: 0.8rem; color: #8c8c8c; font-style: italic;">No candidates enrolled yet</span>`}
+                </div>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+    }
+
+    artsEnrollmentsContainer.innerHTML = buildCardsHtml(artPrograms);
+    sportsEnrollmentsContainer.innerHTML = buildCardsHtml(sportPrograms);
+  }
+
+  // ---------- Reactive Observers & Data Streamers ----------
   listenParticipants((participants) => {
     participantsData = participants;
     if (programSelect.value) {
@@ -195,16 +481,32 @@
     if (currentLookupCode) {
       renderLookupResult();
     }
+    renderScoreboard();
+    renderProgramEnrollments();
   });
 
   listenPrograms((programs) => {
     programsData = programs;
     const current = programSelect.value;
-    programSelect.innerHTML =
-      `<option value="">— Select a program —</option>` +
-      programs
-        .map((p) => `<option value="${p.id}">${p.id} — ${p.title}</option>`)
-        .join("");
+    
+    // Group the programs list cleanly into Arts & Sports dropdown optgroups
+    const artPrograms = programs.filter(p => getProgramCategory(p) === 'art');
+    const sportPrograms = programs.filter(p => getProgramCategory(p) === 'sport');
+
+    const artOptions = artPrograms
+      .map((p) => `<option value="${p.id}">${p.id} — ${p.title}</option>`)
+      .join("");
+
+    const sportOptions = sportPrograms
+      .map((p) => `<option value="${p.id}">${p.id} — ${p.title}</option>`)
+      .join("");
+
+    programSelect.innerHTML = `
+      <option value="">— Select a program —</option>
+      ${artPrograms.length > 0 ? `<optgroup label="🎨 Arts Programs">${artOptions}</optgroup>` : ''}
+      ${sportPrograms.length > 0 ? `<optgroup label="⚽ Sports Programs">${sportOptions}</optgroup>` : ''}
+    `;
+
     if (current) {
       programSelect.value = current;
     }
@@ -212,6 +514,13 @@
     if (currentLookupCode) {
       renderLookupResult();
     }
+    renderScoreboard();
+    renderProgramEnrollments();
+  });
+
+  listenRegistrations((registrations) => {
+    registrationsData = registrations;
+    renderProgramEnrollments();
   });
 
   programSelect.addEventListener("change", () => renderProgramResults(programSelect.value));
@@ -236,13 +545,18 @@
     const house = houseById(participant.team) || { color: "#111" };
     const breakdown = programsData
       .filter((p) => p.scores && p.scores[currentLookupCode] !== undefined)
-      .map((p) => `
-        <tr>
-          <td>${p.id}</td>
-          <td>${p.title}</td>
-          <td style="font-weight:700;">${p.scores[currentLookupCode]}</td>
-        </tr>
-      `)
+      .map((p) => {
+        const cat = getProgramCategory(p);
+        const catBadge = cat === 'art' ? '🎨 Art' : '⚽ Sport';
+        return `
+          <tr>
+            <td>${p.id}</td>
+            <td><span class="team-pill" style="--house-color:#6b6b6b; font-size:0.7rem; padding: 2px 6px;">${catBadge}</span></td>
+            <td>${p.title}</td>
+            <td style="font-weight:700;">${p.scores[currentLookupCode]}</td>
+          </tr>
+        `;
+      })
       .join("");
 
     lookupResult.innerHTML = `
@@ -262,7 +576,7 @@
           breakdown
             ? `<div class="table-wrap" style="margin-top:18px;">
                 <table>
-                  <thead><tr><th>Code</th><th>Program</th><th>Points</th></tr></thead>
+                  <thead><tr><th>Code</th><th>Category</th><th>Program</th><th>Points</th></tr></thead>
                   <tbody>${breakdown}</tbody>
                 </table>
               </div>`
