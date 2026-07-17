@@ -212,18 +212,32 @@
     renderLedgerCandidateOptions();
   }
 
-  // FIXED: Bulletproof engine to prevent Arts and Sports from mixing
+  // ULTRA-ROBUST: Deep Object Scanner Engine
   function getProgramCategory(p) {
     if (!p) return 'art';
     
-    // 1. Explicitly check database property variants
-    const cat = String(p.category || p.type || p.category_id || p.program_category || '').toLowerCase().trim();
-    if (cat.includes('sport')) return 'sport';
-    if (cat.includes('art')) return 'art';
+    // Debug line: inspect this in your browser DevTools (F12) to see exactly what database fields exist
+    console.log("RESCOPE Program Scanner Data:", p);
+
+    // 1. Scan all object properties dynamically for any string containing "sport" or true boolean values
+    for (const key in p) {
+      if (Object.prototype.hasOwnProperty.call(p, key)) {
+        const val = p[key];
+        if (typeof val === 'string') {
+          const s = val.toLowerCase().trim();
+          if (s === 'sport' || s === 'sports' || s.includes('sport')) {
+            return 'sport';
+          }
+        }
+        if (typeof val === 'boolean' && val === true && key.toLowerCase().includes('sport')) {
+          return 'sport';
+        }
+      }
+    }
     
-    // 2. Fallback prefix mapping if property mapping falls through
+    // 2. Fallback prefix code scanning if database fields are missing/null
     const code = String(p.id || '').toLowerCase().trim();
-    if (code.startsWith('s') || code.startsWith('fb') || code.startsWith('bb') || code.startsWith('at')) {
+    if (code.startsWith('s') || code.startsWith('fb') || code.startsWith('bb') || code.startsWith('at') || code.includes('sport')) {
       return 'sport';
     }
     
