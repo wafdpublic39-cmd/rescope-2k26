@@ -17,7 +17,7 @@ try {
 }
 
 // ---- Event Constants ----
-export const ADMIN_PASSWORD = "rescope-admin-2k26";
+export const ADMIN_PASSWORD = "me";
 
 export const HOUSES = [
   { id: "Horizon", label: "HORIZON", color: "#06AED5", passcode: "horizon26" },
