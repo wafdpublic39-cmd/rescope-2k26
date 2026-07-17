@@ -50,6 +50,43 @@
     </div>
   </section>
 
+  <!-- ---- Candidate Roster Manager ---- -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Candidate Roster Manager</h2>
+      <span class="section-num">01 — Roster Control</span>
+    </div>
+    
+    <div class="two-col">
+      <div class="panel">
+        <h3 style="margin-bottom:18px;font-size:1.1rem;">Quick Delete Candidate</h3>
+        <p style="font-size: 0.85rem; color: #6b6b6b; margin-bottom: 16px;">Directly remove any candidate from the entire roster database by their code.</p>
+        <div class="lookup-row">
+          <input type="text" id="delete-cand-input" placeholder="Enter candidate code, e.g. HZ07" />
+          <button class="btn btn-danger" id="delete-cand-btn">Delete</button>
+        </div>
+        <div id="delete-cand-status"></div>
+      </div>
+
+      <div class="panel">
+        <h3 style="margin-bottom:12px;font-size:1.1rem;">Registered Candidates</h3>
+        <div class="field" style="margin-bottom: 16px;">
+          <label for="filter-house-select">Filter by house</label>
+          <select id="filter-house-select">
+            <option value="">— All Houses —</option>
+            <option value="Horizon">Horizon</option>
+            <option value="Eclipse">Eclipse</option>
+            <option value="Vector">Vector</option>
+            <option value="Chroma">Chroma</option>
+          </select>
+        </div>
+        <div id="admin-candidates-list" style="max-height: 260px; overflow-y: auto; border: var(--border-w) solid var(--ink); padding: 10px; background: var(--paper-off);">
+          <!-- Dynamic candidate list with interactive delete hooks -->
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ---- Event Program Manager ---- -->
   <section class="section two-col">
     <div class="panel">
@@ -70,7 +107,7 @@
 
     <div class="panel">
       <h3 style="margin-bottom:18px;font-size:1.1rem;">Existing Programs</h3>
-      <div id="program-list"></div>
+      <div id="program-list" style="max-height: 290px; overflow-y: auto;"></div>
     </div>
   </section>
 
@@ -78,7 +115,7 @@
   <section class="section">
     <div class="section-head">
       <h2>Points Ledger Adjuster</h2>
-      <span class="section-num">Auto-updates program · candidate · house</span>
+      <span class="section-num">02 — Scoresheet</span>
     </div>
 
     <div class="panel">
@@ -128,6 +165,9 @@
     deleteProgram,
     awardPoints,
     listenPrograms,
+    listenParticipants,
+    deleteParticipant,
+    houseById,
   } from "./firebase-config.js";
 
   const gate = document.getElementById("gate");
@@ -146,7 +186,7 @@
     if (pw === ADMIN_PASSWORD) {
       gate.classList.add("hidden");
       dashboard.classList.remove("hidden");
-      startProgramListener();
+      startAdminListeners();
     } else {
       gateError.textContent = "Incorrect master password.";
     }
@@ -159,18 +199,112 @@
   });
 
   let programsData = [];
-  let programListenerStarted = false;
+  let participantsData = [];
+  let listenersStarted = false;
 
-  function startProgramListener() {
-    if (programListenerStarted) return;
-    programListenerStarted = true;
+  function startAdminListeners() {
+    if (listenersStarted) return;
+    listenersStarted = true;
+
+    // Stream Programs
     listenPrograms((programs) => {
       programsData = (programs || []).sort((a, b) => a.id.localeCompare(b.id));
       renderProgramList();
       renderLedgerProgramOptions();
     });
+
+    // Stream Participants
+    listenParticipants((participants) => {
+      participantsData = (participants || []).sort((a, b) => a.id.localeCompare(b.id));
+      renderCandidatesList();
+    });
   }
 
+  // ---- Roster Rendering Engine ----
+  const filterHouseSelect = document.getElementById("filter-house-select");
+  const candidatesListEl = document.getElementById("admin-candidates-list");
+
+  function renderCandidatesList() {
+    const selectedHouse = filterHouseSelect.value;
+    const filtered = participantsData.filter(p => !selectedHouse || p.team === selectedHouse);
+
+    if (filtered.length === 0) {
+      candidatesListEl.innerHTML = `<div class="empty-state">No candidates found.</div>`;
+      return;
+    }
+
+    candidatesListEl.innerHTML = filtered
+      .map(p => {
+        const house = houseById(p.team) || { color: "#111" };
+        return `
+          <div class="roster-row" style="margin-bottom: 8px;">
+            <div class="who">
+              <span>${p.name} <span class="team-pill" style="--house-color:${house.color}; font-size: 0.65rem; padding: 2px 6px; margin-left: 6px; display: inline-flex;">${p.team}</span></span>
+              <span class="code">${p.id} · Score: ${p.totalPoints || 0} pts</span>
+            </div>
+            <button class="btn btn-danger" data-delete-cand="${p.id}" style="padding: 6px 12px; font-size: 0.72rem;">Delete</button>
+          </div>
+        `;
+      })
+      .join("");
+
+    // Hook Delete Actions onto list elements
+    candidatesListEl.querySelectorAll("[data-delete-cand]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const code = btn.dataset.deleteCand;
+        const target = participantsData.find(p => p.id === code);
+        const name = target ? target.name : code;
+
+        if (!confirm(`Warning: Are you sure you want to delete candidate "${name}" (${code})? This will permanently wipe their registration from the database.`)) return;
+        
+        try {
+          await deleteParticipant(code);
+        } catch (err) {
+          alert("Error removing participant: " + err.message);
+        }
+      });
+    });
+  }
+
+  filterHouseSelect.addEventListener("change", renderCandidatesList);
+
+  // ---- Quick Manual Delete Form ----
+  const deleteCandInput = document.getElementById("delete-cand-input");
+  const deleteCandBtn = document.getElementById("delete-cand-btn");
+  const deleteCandStatus = document.getElementById("delete-cand-status");
+
+  async function handleManualDelete() {
+    const code = deleteCandInput.value.trim().toUpperCase();
+    deleteCandStatus.innerHTML = "";
+
+    if (!code) {
+      deleteCandStatus.innerHTML = `<div class="status-msg err">Please enter a candidate code first.</div>`;
+      return;
+    }
+
+    const target = participantsData.find(p => p.id === code);
+    if (!target) {
+      deleteCandStatus.innerHTML = `<div class="status-msg err">Candidate "${code}" does not exist in roster.</div>`;
+      return;
+    }
+
+    if (!confirm(`Warning: Are you sure you want to delete candidate "${target.name}" (${code})?`)) return;
+
+    try {
+      await deleteParticipant(code);
+      deleteCandStatus.innerHTML = `<div class="status-msg ok">Successfully deleted candidate "${code}" (${target.name}).</div>`;
+      deleteCandInput.value = "";
+    } catch (err) {
+      deleteCandStatus.innerHTML = `<div class="status-msg err">Error: ${err.message}</div>`;
+    }
+  }
+
+  deleteCandBtn.addEventListener("click", handleManualDelete);
+  deleteCandInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") handleManualDelete();
+  });
+
+  // ---- Programs Rendering Engine ----
   function renderProgramList() {
     const el = document.getElementById("program-list");
     if (programsData.length === 0) {
@@ -180,12 +314,12 @@
     el.innerHTML = programsData
       .map(
         (p) => `
-        <div class="roster-row">
+        <div class="roster-row" style="margin-bottom: 8px;">
           <div class="who">
             <span>${p.title}</span>
             <span class="code">${p.id}</span>
           </div>
-          <button class="btn btn-danger" data-delete="${p.id}" style="padding:8px 12px;font-size:0.72rem;">Delete</button>
+          <button class="btn btn-danger" data-delete="${p.id}" style="padding:6px 12px;font-size:0.72rem;">Delete</button>
         </div>
       `
       )
