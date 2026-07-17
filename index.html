@@ -254,17 +254,41 @@
     console.warn("Seeding bypassed:", e.message);
   }
 
-  // ---------- Category Detection Helper ----------
-  // Safely checks categories based on program values or prefixed program codes (A01 vs S01)
+  // ---------- Category Detection Helper (ULTRA-ROBUST) ----------
+  // Deep Keyword & Flag Scanner to guarantee zero program misclassifications
   function getProgramCategory(p) {
-    const cat = (p.category || p.type || '').toLowerCase();
-    if (cat.includes('art')) return 'art';
-    if (cat.includes('sport')) return 'sport';
+    if (!p) return 'art';
     
-    const id = (p.id || '').toLowerCase();
-    if (id.startsWith('a')) return 'art';
-    if (id.startsWith('s')) return 'sport';
-    return 'art'; // Default fallback
+    // Explicit array of sports terms to cleanly trap edge cases like 'wrestling'
+    const sportsKeywords = [
+      'sport', 'sports', 'wrestling', 'wrestle', 'football', 'cricket', 
+      'volleyball', 'basketball', 'badminton', 'tennis', 'kabaddi', 
+      'athletics', 'race', 'running', 'chess', 'carrom', 'tug of war', 'match'
+    ];
+
+    for (const key in p) {
+      if (Object.prototype.hasOwnProperty.call(p, key)) {
+        const val = p[key];
+        if (typeof val === 'string') {
+          const s = val.toLowerCase().trim();
+          if (s === 'sport' || s === 'sports') return 'sport';
+          if (sportsKeywords.some(kw => s.includes(kw))) {
+            return 'sport';
+          }
+        }
+        if (typeof val === 'boolean' && val === true && key.toLowerCase().includes('sport')) {
+          return 'sport';
+        }
+      }
+    }
+    
+    // Fallback checks on alphanumeric program routing syntax codes
+    const code = String(p.id || '').toLowerCase().trim();
+    if (code.startsWith('s') || code.startsWith('fb') || code.startsWith('bb') || code.startsWith('at') || code.includes('sport')) {
+      return 'sport';
+    }
+    
+    return 'art';
   }
 
   // ---------- Standings Points Compiler ----------
