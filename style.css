@@ -84,9 +84,9 @@ button, input, select {
 }
 
 .container {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 0 24px;
+  max-width: 1000px; /* Adjust this number to make it wider or narrower */
+  margin: 0 auto;    /* This centers the container on the screen */
+  width: 95%;        /* Ensures it doesn't touch the edges on small mobile screens */
 }
 
 /* ---------- Top bar / nav ---------- */
