@@ -3,8 +3,66 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>RESCOPE 2K26 — Admin</title>
+<title>RESCOPE 2K26 — Live Standings</title>
 <link rel="stylesheet" href="style.css" />
+<style>
+  /* Styling for the new Program Enrollments Grid & Chips */
+  .program-chips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+  .program-enrollment-card {
+    background: var(--paper, #fff);
+    border: var(--border-w, 2px) solid var(--ink, #111);
+    padding: 18px;
+    box-shadow: 4px 4px 0px var(--ink, #111);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .enrollment-title-bar {
+    font-family: var(--font-mono, monospace);
+    font-weight: 800;
+    font-size: 1.05rem;
+    border-bottom: 1px solid var(--ink, #111);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .enrollment-code {
+    font-size: 0.72rem;
+    background: var(--paper-off, #f5f5f5);
+    border: 1px solid var(--ink, #111);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: normal;
+  }
+  .chips-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .candidate-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--paper-off, #f5f5f5);
+    border: 1px solid var(--ink, #111);
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .chip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.2);
+  }
+</style>
 </head>
 <body>
 
@@ -12,144 +70,86 @@
   <div class="topbar-inner">
     <div class="brand">RESCOPE <span class="brand-year">2K26</span></div>
     <nav class="nav-links">
-      <a href="index.html">Standings</a>
+      <a href="index.html" class="active">Standings</a>
       <a href="signin.html">Team Access</a>
-      <a href="admin.html" class="active">Admin</a>
+      <a href="admin.html">Admin</a>
     </nav>
   </div>
 </header>
 
-<!-- ============ ADMIN PASSWORD GATE ============ -->
-<div class="gate" id="gate">
-  <div class="gate-box">
-    <h2>Admin Access</h2>
-    <span class="sub">Master password required to open the command center.</span>
-    <div class="field">
-      <label for="admin-password">Master password</label>
-      <input type="password" id="admin-password" placeholder="Enter master password" />
-    </div>
-    <button class="btn btn-block" id="admin-login-btn">Unlock Dashboard</button>
-    <div class="error-text" id="gate-error"></div>
-    
-    <div style="margin-top: 20px; text-align: center;">
-      <a href="index.html" style="font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: #6b6b6b; text-decoration: none;">← Back to Scoreboard</a>
-    </div>
+<section class="hero">
+  <div class="hero-inner">
+    <span class="eyebrow">Arts &amp; Sports Festival</span>
+    <h1>Four houses.<br />One scoreboard.</h1>
+    <p class="lede">Live results for Horizon, Eclipse, Vector and Chroma — updating in real time as points land.</p>
   </div>
-</div>
+</section>
 
-<!-- ============ ADMIN DASHBOARD ============ -->
-<main class="container hidden" id="dashboard">
+<main class="container">
 
-  <section class="section" style="border-bottom:none;padding-bottom:0;">
+  <!-- ============ LIVE STANDINGS ============ -->
+  <section class="section" id="standings">
     <div class="section-head">
-      <h2>Command Center</h2>
-      <div class="btn-row">
-        <a href="index.html" class="btn btn-outline">Go to Scoreboard</a>
-        <button class="btn btn-danger" id="signout-btn">Lock Dashboard</button>
+      <h2>House Standings</h2>
+      <span class="section-num">01 — Live</span>
+    </div>
+    <div class="scoreboard" id="scoreboard">
+      <!-- team cards injected here -->
+    </div>
+  </section>
+
+  <!-- ============ PROGRAM RESULTS ROOM ============ -->
+  <section class="section" id="results-room">
+    <div class="section-head">
+      <h2>Program Results Room</h2>
+      <span class="section-num">02 — By Event</span>
+    </div>
+
+    <div class="panel">
+      <div class="field" style="max-width:360px;">
+        <label for="program-select">Choose a program</label>
+        <select id="program-select">
+          <option value="">— Select a program —</option>
+        </select>
+      </div>
+
+      <div id="program-results-wrap">
+        <div class="empty-state">Select a program above to see its published standings.</div>
       </div>
     </div>
   </section>
 
-  <!-- ---- Candidate Roster Manager ---- -->
-  <section class="section">
+  <!-- ============ CANDIDATE LOOKUP ============ -->
+  <section class="section" id="lookup">
     <div class="section-head">
-      <h2>Candidate Roster Manager</h2>
-      <span class="section-num">01 — Roster Control</span>
+      <h2>Candidate Results Lookup</h2>
+      <span class="section-num">03 — By Code</span>
     </div>
-    
-    <div class="two-col">
-      <div class="panel">
-        <h3 style="margin-bottom:18px;font-size:1.1rem;">Quick Delete Candidate</h3>
-        <p style="font-size: 0.85rem; color: #6b6b6b; margin-bottom: 16px;">Directly remove any candidate from the entire roster database by their code.</p>
-        <div class="lookup-row">
-          <input type="text" id="delete-cand-input" placeholder="Enter candidate code, e.g. HZ07" />
-          <button class="btn btn-danger" id="delete-cand-btn">Delete</button>
-        </div>
-        <div id="delete-cand-status"></div>
-      </div>
 
-      <div class="panel">
-        <h3 style="margin-bottom:12px;font-size:1.1rem;">Registered Candidates</h3>
-        <div class="field" style="margin-bottom: 16px;">
-          <label for="filter-house-select">Filter by house</label>
-          <select id="filter-house-select">
-            <option value="">— All Houses —</option>
-            <option value="Horizon">Horizon</option>
-            <option value="Eclipse">Eclipse</option>
-            <option value="Vector">Vector</option>
-            <option value="Chroma">Chroma</option>
-          </select>
-        </div>
-        <div id="admin-candidates-list" style="max-height: 260px; overflow-y: auto; border: var(--border-w) solid var(--ink); padding: 10px; background: var(--paper-off);">
-          <!-- Dynamic candidate list with interactive delete hooks -->
-        </div>
+    <div class="panel">
+      <div class="lookup-row">
+        <input type="text" id="lookup-input" placeholder="Enter your participant code, e.g. HZ07" />
+        <button class="btn" id="lookup-btn">Search</button>
       </div>
+      <div id="lookup-status"></div>
+      <div id="lookup-result" class="result-card"></div>
     </div>
   </section>
 
-  <!-- ---- Event Program Manager ---- -->
-  <section class="section two-col">
-    <div class="panel">
-      <h3 style="margin-bottom:18px;font-size:1.1rem;">Add Program</h3>
-      <form id="add-program-form">
-        <div class="field">
-          <label for="program-code">Program code</label>
-          <input type="text" id="program-code" placeholder="e.g. FA-01" required />
-        </div>
-        <div class="field">
-          <label for="program-title">Title</label>
-          <input type="text" id="program-title" placeholder="e.g. Solo Dance" required />
-        </div>
-        <button type="submit" class="btn btn-signal btn-block">Add Program</button>
-      </form>
-      <div id="add-program-status"></div>
-    </div>
-
-    <div class="panel">
-      <h3 style="margin-bottom:18px;font-size:1.1rem;">Existing Programs</h3>
-      <div id="program-list" style="max-height: 290px; overflow-y: auto;"></div>
-    </div>
-  </section>
-
-  <!-- ---- Points Ledger Adjuster ---- -->
-  <section class="section">
+  <!-- ============ ACTIVE PROGRAM ENROLLMENTS ============ -->
+  <section class="section" id="enrollments">
     <div class="section-head">
-      <h2>Points Ledger Adjuster</h2>
-      <span class="section-num">02 — Scoresheet</span>
+      <h2>Active Program Enrollments</h2>
+      <span class="section-num">04 — Enrollments</span>
     </div>
 
     <div class="panel">
-      <form id="ledger-form">
-        <div class="grid-2">
-          <div class="field">
-            <label for="ledger-program">Program</label>
-            <select id="ledger-program" required>
-              <option value="">— Select program —</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="ledger-code">Candidate code</label>
-            <input type="text" id="ledger-code" placeholder="e.g. HZ07" required />
-          </div>
-        </div>
-
-        <div class="grid-2">
-          <div class="field">
-            <label>Action</label>
-            <div class="segmented" id="action-toggle">
-              <button type="button" class="active add" data-action="add">Add</button>
-              <button type="button" class="subtract" data-action="subtract">Subtract</button>
-            </div>
-          </div>
-          <div class="field">
-            <label for="ledger-value">Point value</label>
-            <input type="number" id="ledger-value" min="1" step="1" placeholder="e.g. 10" required />
-          </div>
-        </div>
-
-        <button type="submit" class="btn btn-block">Submit Ledger Entry</button>
-      </form>
-      <div id="ledger-status"></div>
+      <p style="font-size: 0.95rem; color: #6b6b6b; margin-bottom: 20px;">
+        Explore registered team candidates dynamically matched to the programs published by the admin.
+      </p>
+      <div class="program-chips-grid" id="enrollments-container">
+        <div class="empty-state">Loading active program allocations...</div>
+      </div>
     </div>
   </section>
 
@@ -159,252 +159,269 @@
 
 <script type="module">
   import {
-    supabase,
-    ADMIN_PASSWORD,
-    addProgram,
-    deleteProgram,
-    awardPoints,
-    listenPrograms,
+    seedTeamsIfEmpty,
+    listenTeams,
     listenParticipants,
-    deleteParticipant,
+    listenPrograms,
+    listenRegistrations, // Newly integrated DB listener mapping registrations
     houseById,
   } from "./firebase-config.js";
 
-  const gate = document.getElementById("gate");
-  const dashboard = document.getElementById("dashboard");
-  const gateError = document.getElementById("gate-error");
-
-  document.getElementById("admin-login-btn").addEventListener("click", () => {
-    const pw = document.getElementById("admin-password").value;
-    gateError.textContent = "";
-
-    if (!supabase) {
-      gateError.textContent = "Database client missing! Set your Anon Key inside firebase-config.js first.";
-      return;
-    }
-
-    if (pw === ADMIN_PASSWORD) {
-      gate.classList.add("hidden");
-      dashboard.classList.remove("hidden");
-      startAdminListeners();
-    } else {
-      gateError.textContent = "Incorrect master password.";
-    }
-  });
-
-  document.getElementById("signout-btn").addEventListener("click", () => {
-    document.getElementById("admin-password").value = "";
-    dashboard.classList.add("hidden");
-    gate.classList.remove("hidden");
-  });
-
-  let programsData = [];
+  let teamsData = [];
   let participantsData = [];
-  let listenersStarted = false;
+  let programsData = [];
+  let registrationsData = []; // State placeholder for registration linkages
+  let prevScores = {};
+  let currentLookupCode = "";
 
-  function startAdminListeners() {
-    if (listenersStarted) return;
-    listenersStarted = true;
-
-    // Stream Programs
-    listenPrograms((programs) => {
-      programsData = (programs || []).sort((a, b) => a.id.localeCompare(b.id));
-      renderProgramList();
-      renderLedgerProgramOptions();
-    });
-
-    // Stream Participants
-    listenParticipants((participants) => {
-      participantsData = (participants || []).sort((a, b) => a.id.localeCompare(b.id));
-      renderCandidatesList();
-    });
+  try {
+    await seedTeamsIfEmpty();
+  } catch (e) {
+    console.warn("Seeding bypassed:", e.message);
   }
 
-  // ---- Roster Rendering Engine ----
-  const filterHouseSelect = document.getElementById("filter-house-select");
-  const candidatesListEl = document.getElementById("admin-candidates-list");
+  // ---------- Standings ----------
+  const scoreboardEl = document.getElementById("scoreboard");
 
-  function renderCandidatesList() {
-    const selectedHouse = filterHouseSelect.value;
-    const filtered = participantsData.filter(p => !selectedHouse || p.team === selectedHouse);
-
-    if (filtered.length === 0) {
-      candidatesListEl.innerHTML = `<div class="empty-state">No candidates found.</div>`;
-      return;
-    }
-
-    candidatesListEl.innerHTML = filtered
-      .map(p => {
-        const house = houseById(p.team) || { color: "#111" };
+  function renderScoreboard(teams) {
+    const sorted = [...teams].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+    scoreboardEl.innerHTML = sorted
+      .map((team, i) => {
+        const house = houseById(team.id) || { color: "#111" };
+        const bumped = prevScores[team.id] !== undefined && prevScores[team.id] !== team.totalPoints;
         return `
-          <div class="roster-row" style="margin-bottom: 8px;">
-            <div class="who">
-              <span>${p.name} <span class="team-pill" style="--house-color:${house.color}; font-size: 0.65rem; padding: 2px 6px; margin-left: 6px; display: inline-flex;">${p.team}</span></span>
-              <span class="code">${p.id} · Score: ${p.totalPoints || 0} pts</span>
-            </div>
-            <button class="btn btn-danger" data-delete-cand="${p.id}" style="padding: 6px 12px; font-size: 0.72rem;">Delete</button>
+          <div class="team-card" style="--house-color:${house.color}">
+            <div class="stripe"></div>
+            <div class="rank">RANK ${i + 1}</div>
+            <h3><span class="swatch"></span>${team.id}</h3>
+            <div class="score ${bumped ? "bump" : ""}">${team.totalPoints || 0}</div>
+            <div class="score-label">Total Points</div>
           </div>
         `;
       })
       .join("");
-
-    // Hook Delete Actions onto list elements
-    candidatesListEl.querySelectorAll("[data-delete-cand]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const code = btn.dataset.deleteCand;
-        const target = participantsData.find(p => p.id === code);
-        const name = target ? target.name : code;
-
-        if (!confirm(`Warning: Are you sure you want to delete candidate "${name}" (${code})? This will permanently wipe their registration from the database.`)) return;
-        
-        try {
-          await deleteParticipant(code);
-        } catch (err) {
-          alert("Error removing participant: " + err.message);
-        }
-      });
-    });
+    teams.forEach((t) => (prevScores[t.id] = t.totalPoints));
   }
 
-  filterHouseSelect.addEventListener("change", renderCandidatesList);
-
-  // ---- Quick Manual Delete Form ----
-  const deleteCandInput = document.getElementById("delete-cand-input");
-  const deleteCandBtn = document.getElementById("delete-cand-btn");
-  const deleteCandStatus = document.getElementById("delete-cand-status");
-
-  async function handleManualDelete() {
-    const code = deleteCandInput.value.trim().toUpperCase();
-    deleteCandStatus.innerHTML = "";
-
-    if (!code) {
-      deleteCandStatus.innerHTML = `<div class="status-msg err">Please enter a candidate code first.</div>`;
-      return;
-    }
-
-    const target = participantsData.find(p => p.id === code);
-    if (!target) {
-      deleteCandStatus.innerHTML = `<div class="status-msg err">Candidate "${code}" does not exist in roster.</div>`;
-      return;
-    }
-
-    if (!confirm(`Warning: Are you sure you want to delete candidate "${target.name}" (${code})?`)) return;
-
-    try {
-      await deleteParticipant(code);
-      deleteCandStatus.innerHTML = `<div class="status-msg ok">Successfully deleted candidate "${code}" (${target.name}).</div>`;
-      deleteCandInput.value = "";
-    } catch (err) {
-      deleteCandStatus.innerHTML = `<div class="status-msg err">Error: ${err.message}</div>`;
-    }
-  }
-
-  deleteCandBtn.addEventListener("click", handleManualDelete);
-  deleteCandInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") handleManualDelete();
+  listenTeams((teams) => {
+    teamsData = teams;
+    renderScoreboard(teams);
   });
 
-  // ---- Programs Rendering Engine ----
-  function renderProgramList() {
-    const el = document.getElementById("program-list");
-    if (programsData.length === 0) {
-      el.innerHTML = `<div class="empty-state">No programs yet. Add one to get started.</div>`;
+  // ---------- Program Results Room ----------
+  const programSelect = document.getElementById("program-select");
+  const programResultsWrap = document.getElementById("program-results-wrap");
+
+  function medalFor(rank) {
+    if (rank === 0) return '<span class="medal gold">1ST</span>';
+    if (rank === 1) return '<span class="medal silver">2ND</span>';
+    if (rank === 2) return '<span class="medal bronze">3RD</span>';
+    return "";
+  }
+
+  function renderProgramResults(programCode) {
+    const program = programsData.find((p) => p.id === programCode);
+    if (!program) {
+      programResultsWrap.innerHTML = `<div class="empty-state">Select a program above to see its published standings.</div>`;
       return;
     }
-    el.innerHTML = programsData
-      .map(
-        (p) => `
-        <div class="roster-row" style="margin-bottom: 8px;">
-          <div class="who">
-            <span>${p.title}</span>
-            <span class="code">${p.id}</span>
-          </div>
-          <button class="btn btn-danger" data-delete="${p.id}" style="padding:6px 12px;font-size:0.72rem;">Delete</button>
-        </div>
-      `
-      )
+    const entries = Object.entries(program.scores || {}).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) {
+      programResultsWrap.innerHTML = `<div class="empty-state">No scores published yet for ${program.title}.</div>`;
+      return;
+    }
+
+    const rows = entries
+      .map(([code, points], i) => {
+        const participant = participantsData.find((p) => p.id === code);
+        const house = participant ? houseById(participant.team) : null;
+        return `
+          <tr class="row-in" style="animation-delay:${i * 0.03}s">
+            <td>${medalFor(i)}</td>
+            <td>${code}</td>
+            <td>${participant ? participant.name : "—"}</td>
+            <td>${
+              participant && house
+                ? `<span class="team-pill" style="--house-color:${house.color}">${participant.team}</span>`
+                : "—"
+            }</td>
+            <td style="font-weight:700;">${points}</td>
+          </tr>
+        `;
+      })
       .join("");
 
-    el.querySelectorAll("[data-delete]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        if (!confirm(`Delete program "${btn.dataset.delete}"? This cannot be undone.`)) return;
-        try {
-          await deleteProgram(btn.dataset.delete);
-        } catch (err) {
-          alert(err.message);
+    programResultsWrap.innerHTML = `
+      <div class="table-wrap" style="margin-top:20px;">
+        <table>
+          <thead>
+            <tr><th></th><th>Code</th><th>Name</th><th>House</th><th>Points</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // ---------- Dynamic Program Enrollment Renderer ----------
+  const enrollmentsContainer = document.getElementById("enrollments-container");
+
+  function renderProgramEnrollments() {
+    if (!enrollmentsContainer) return;
+
+    if (programsData.length === 0) {
+      enrollmentsContainer.innerHTML = `<div class="empty-state">No active programs added by Admin yet.</div>`;
+      return;
+    }
+
+    enrollmentsContainer.innerHTML = programsData
+      .map((prog) => {
+        // Retrieve registration mappings belonging specifically to this program
+        const matches = registrationsData.filter((r) => r.program_id === prog.id);
+
+        // Map matching keys to candidate meta details and build responsive display chips
+        const chipsHtml = matches
+          .map((reg) => {
+            const participant = participantsData.find((p) => p.id === reg.participant_id);
+            if (!participant) return ""; // Handle edge-case stale entries cleanly
+
+            const house = houseById(participant.team) || { color: "#6b6b6b" };
+
+            return `
+              <span class="candidate-chip" title="House: ${participant.team}">
+                <span class="chip-dot" style="background-color: ${house.color}"></span>
+                <span>${participant.name} <span style="font-family: var(--font-mono, monospace); font-size: 0.72rem; color: #6b6b6b;">(${participant.id})</span></span>
+              </span>
+            `;
+          })
+          .filter(Boolean)
+          .join("");
+
+        return `
+          <div class="program-enrollment-card">
+            <div>
+              <div class="enrollment-title-bar">
+                <span>${prog.title}</span>
+                <span class="enrollment-code">${prog.id}</span>
+              </div>
+              <div class="chips-wrap">
+                ${chipsHtml || `<span style="font-size: 0.8rem; color: #8c8c8c; font-style: italic;">No candidates enrolled yet</span>`}
+              </div>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  // Reactive dependency mapping to prevent dashboard render lag
+  listenParticipants((participants) => {
+    participantsData = participants;
+    if (programSelect.value) {
+      renderProgramResults(programSelect.value);
+    }
+    if (currentLookupCode) {
+      renderLookupResult();
+    }
+    renderProgramEnrollments();
+  });
+
+  listenPrograms((programs) => {
+    programsData = programs;
+    const current = programSelect.value;
+    programSelect.innerHTML =
+      `<option value="">— Select a program —</option>` +
+      programs
+        .map((p) => `<option value="${p.id}">${p.id} — ${p.title}</option>`)
+        .join("");
+    if (current) {
+      programSelect.value = current;
+    }
+    renderProgramResults(programSelect.value);
+    if (currentLookupCode) {
+      renderLookupResult();
+    }
+    renderProgramEnrollments();
+  });
+
+  // Listen to realtime registration changes
+  listenRegistrations((registrations) => {
+    registrationsData = registrations;
+    renderProgramEnrollments();
+  });
+
+  programSelect.addEventListener("change", () => renderProgramResults(programSelect.value));
+
+  // ---------- Reactive Candidate Lookup ----------
+  const lookupInput = document.getElementById("lookup-input");
+  const lookupBtn = document.getElementById("lookup-btn");
+  const lookupStatus = document.getElementById("lookup-status");
+  const lookupResult = document.getElementById("lookup-result");
+
+  function renderLookupResult() {
+    lookupStatus.innerHTML = "";
+    if (!currentLookupCode) return;
+
+    const participant = participantsData.find((p) => p.id === currentLookupCode);
+    if (!participant) {
+      lookupResult.innerHTML = "";
+      lookupStatus.innerHTML = `<div class="status-msg err">No candidate found for code "${currentLookupCode}".</div>`;
+      return;
+    }
+
+    const house = houseById(participant.team) || { color: "#111" };
+    const breakdown = programsData
+      .filter((p) => p.scores && p.scores[currentLookupCode] !== undefined)
+      .map((p) => `
+        <tr>
+          <td>${p.id}</td>
+          <td>${p.title}</td>
+          <td style="font-weight:700;">${p.scores[currentLookupCode]}</td>
+        </tr>
+      `)
+      .join("");
+
+    lookupResult.innerHTML = `
+      <div class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div class="rank" style="font-family:var(--font-mono);font-size:0.75rem;color:#6b6b6b;">${currentLookupCode}</div>
+            <h3 style="font-size:1.4rem;">${participant.name}</h3>
+            <span class="team-pill" style="--house-color:${house.color};margin-top:6px;display:inline-flex;">${participant.team}</span>
+          </div>
+          <div style="text-align:right;">
+            <div class="score" style="font-size:2.2rem;">${participant.totalPoints || 0}</div>
+            <div class="score-label">Total Points</div>
+          </div>
+        </div>
+        ${
+          breakdown
+            ? `<div class="table-wrap" style="margin-top:18px;">
+                <table>
+                  <thead><tr><th>Code</th><th>Program</th><th>Points</th></tr></thead>
+                  <tbody>${breakdown}</tbody>
+                </table>
+              </div>`
+            : `<div class="empty-state" style="margin-top:18px;">No scored programs yet.</div>`
         }
-      });
-    });
+      </div>
+    `;
   }
 
-  function renderLedgerProgramOptions() {
-    const select = document.getElementById("ledger-program");
-    const current = select.value;
-    select.innerHTML =
-      `<option value="">— Select program —</option>` +
-      programsData.map((p) => `<option value="${p.id}">${p.id} — ${p.title}</option>`).join("");
-    if (current) select.value = current;
+  function handleLookupSubmit() {
+    const code = lookupInput.value.trim().toUpperCase();
+    if (!code) {
+      lookupResult.innerHTML = "";
+      lookupStatus.innerHTML = `<div class="status-msg err">Enter a participant code first.</div>`;
+      return;
+    }
+    currentLookupCode = code;
+    renderLookupResult();
   }
 
-  document.getElementById("add-program-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const codeInput = document.getElementById("program-code");
-    const titleInput = document.getElementById("program-title");
-    const statusEl = document.getElementById("add-program-status");
-    statusEl.innerHTML = "";
-    try {
-      const code = await addProgram(codeInput.value, titleInput.value);
-      statusEl.innerHTML = `<div class="status-msg ok">Program "${code}" added.</div>`;
-      codeInput.value = "";
-      titleInput.value = "";
-    } catch (err) {
-      statusEl.innerHTML = `<div class="status-msg err">${err.message}</div>`;
-    }
-  });
-
-  let currentAction = "add";
-  document.querySelectorAll("#action-toggle button").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll("#action-toggle button").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      currentAction = btn.dataset.action;
-    });
-  });
-
-  document.getElementById("ledger-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const programCode = document.getElementById("ledger-program").value;
-    const candidateCode = document.getElementById("ledger-code").value;
-    const rawValue = Number(document.getElementById("ledger-value").value);
-    const statusEl = document.getElementById("ledger-status");
-    statusEl.innerHTML = "";
-
-    if (!programCode) {
-      statusEl.innerHTML = `<div class="status-msg err">Select a program first.</div>`;
-      return;
-    }
-    if (!candidateCode.trim()) {
-      statusEl.innerHTML = `<div class="status-msg err">Enter a candidate code.</div>`;
-      return;
-    }
-    if (!rawValue || rawValue <= 0) {
-      statusEl.innerHTML = `<div class="status-msg err">Enter a positive point value.</div>`;
-      return;
-    }
-
-    const delta = currentAction === "add" ? rawValue : -rawValue;
-
-    try {
-      const result = await awardPoints(programCode, candidateCode, delta);
-      statusEl.innerHTML = `<div class="status-msg ok">
-        ${currentAction === "add" ? "Added" : "Subtracted"} ${rawValue} pt(s) for ${candidateCode.toUpperCase()} in ${programCode.toUpperCase()}.
-        New program score: ${result.newProgramScore} · New candidate total: ${result.newParticipantTotal}.
-      </div>`;
-      document.getElementById("ledger-code").value = "";
-      document.getElementById("ledger-value").value = "";
-    } catch (err) {
-      statusEl.innerHTML = `<div class="status-msg err">${err.message}</div>`;
-    }
+  lookupBtn.addEventListener("click", handleLookupSubmit);
+  lookupInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") handleLookupSubmit();
   });
 </script>
 
