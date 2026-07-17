@@ -3,9 +3,9 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 const SUPABASE_URL = "https://fcpfbytheqzvhnyohlxe.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjcGZieXRoZXF6dmhueW9obHhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxOTk1MTEsImV4cCI6MjA5OTc3NTUxMX0.oZxtqnnwBDFn7_tDdHaZP6NLHB9qRdaqRe0EXAb4Wbk"; // <-- Double check this key string!
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"; // <-- Keep your actual public anon key here!
 
-// Safe client instantiation to prevent top-level script compilation failure
+// Safe client instantiation
 export let supabase;
 try {
   if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === "YOUR_SUPABASE_ANON_KEY") {
@@ -17,7 +17,7 @@ try {
 }
 
 // ---- Event Constants ----
-export const ADMIN_PASSWORD = "mradmin";
+export const ADMIN_PASSWORD = "rescope-admin-2k26";
 
 export const HOUSES = [
   { id: "Horizon", label: "HORIZON", color: "#06AED5", passcode: "horizon26" },
@@ -102,7 +102,7 @@ export function listenPrograms(callback) {
   return () => supabase.removeChannel(channel);
 }
 
-// ---- Roster Registrations ----
+// ---- Roster Registrations & Deletions ----
 export async function registerParticipant(code, name, teamId) {
   if (!supabase) throw new Error("Database client not connected.");
   const cleanCode = code.trim().toUpperCase();
@@ -122,6 +122,19 @@ export async function registerParticipant(code, name, teamId) {
     team: teamId,
     totalPoints: 0,
   });
+
+  if (error) throw error;
+  return cleanCode;
+}
+
+export async function deleteParticipant(code) {
+  if (!supabase) throw new Error("Database client not connected.");
+  const cleanCode = code.trim().toUpperCase();
+
+  const { error } = await supabase
+    .from("participants")
+    .delete()
+    .eq("id", cleanCode);
 
   if (error) throw error;
   return cleanCode;
