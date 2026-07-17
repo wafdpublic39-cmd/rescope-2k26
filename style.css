@@ -41,10 +41,17 @@
 
 * { box-sizing: border-box; }
 
+
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--paper);
+  /* This creates the watermark effect */
+  background: linear-gradient(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.95)), url('RESCOPE LOGO.jpg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-attachment: fixed;
+  background-size: 40%;
+  
   color: var(--ink);
   font-family: var(--font-body);
 }
@@ -52,6 +59,7 @@ html, body {
 body {
   min-height: 100vh;
   animation: page-fade 0.5s ease both;
+  position: relative;
 }
 
 @keyframes page-fade {
@@ -669,20 +677,3 @@ footer {
   .two-col { grid-template-columns: 1fr; }
 }
 
-body {
-  position: relative;
-}
-
-html, body {
-  margin: 0;
-  padding: 0;
-  /* This creates the watermark effect */
-  background: linear-gradient(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.95)), url('RESCOPE LOGO.jpg');
-  background-repeat: no-repeat;
-  background-position: center;
-  background-attachment: fixed;
-  background-size: 40%;
-  
-  color: var(--ink);
-  font-family: var(--font-body);
-}
