@@ -51,7 +51,7 @@ html, body {
   margin: 0;
   padding: 0;
   /* This creates the watermark effect */
-  background: linear-gradient(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.95)), url('RESCOPE LOGO.png');
+  background: linear-gradient(rgba(245, 245, 245, 0.95), rgba(245, 245, 245, 0.95)), url('RESCOPE LOGO.png');
   background-repeat: no-repeat;
   background-position: center;
   background-attachment: fixed;
