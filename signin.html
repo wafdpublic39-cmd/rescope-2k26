@@ -50,7 +50,7 @@
   </div>
 </div>
 
-<!-- ============ ROSTER DASHBOARD ============ -->
+<!-- ============ ROSTER & PROGRAM DASHBOARD ============ -->
 <main class="container hidden" id="dashboard">
 
   <section class="section" style="border-bottom:none;padding-bottom:0;">
@@ -63,7 +63,8 @@
     </div>
   </section>
 
-  <section class="section two-col">
+  <!-- ---- Section 1: Candidate Management ---- -->
+  <section class="section two-col" style="border-bottom: 1px solid var(--ink); padding-bottom: 30px;">
     <div class="panel">
       <h3 style="margin-bottom:18px;font-size:1.1rem;">Register a Candidate</h3>
       <form id="register-form">
@@ -81,8 +82,41 @@
     </div>
 
     <div class="panel">
-      <h3 style="margin-bottom:18px;font-size:1.1rem;">Active Roster</h3>
-      <div id="roster-list"></div>
+      <h3 style="margin-bottom:18px;font-size:1.1rem;">Active House Roster</h3>
+      <div id="roster-list" style="max-height: 250px; overflow-y: auto;"></div>
+    </div>
+  </section>
+
+  <!-- ---- Section 2: Program Enrollments ---- -->
+  <section class="section two-col">
+    <div class="panel">
+      <h3 style="margin-bottom:18px;font-size:1.1rem;">Enroll in Program</h3>
+      <p style="font-size: 0.85rem; color: #6b6b6b; margin-bottom: 16px;">
+        Assign your registered house candidates to programs added by the admin.
+      </p>
+      <form id="program-enroll-form">
+        <div class="field">
+          <label for="enroll-candidate">Select Candidate</label>
+          <select id="enroll-candidate" required>
+            <option value="">— Select house candidate —</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="enroll-program">Select Program</label>
+          <select id="enroll-program" required>
+            <option value="">— Select program —</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-signal btn-block">Register for Program</button>
+      </form>
+      <div id="enroll-status"></div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-bottom:18px;font-size:1.1rem;">Active Program Enrollments</h3>
+      <div id="enrollments-list" style="max-height: 290px; overflow-y: auto; border: var(--border-w) solid var(--ink); padding: 10px; background: var(--paper-off);">
+        <!-- Active registrations mapped out here -->
+      </div>
     </div>
   </section>
 
@@ -91,7 +125,16 @@
 <footer>RESCOPE 2K26 · Horizon · Eclipse · Vector · Chroma</footer>
 
 <script type="module">
-  import { HOUSES, registerParticipant, listenParticipants, houseById } from "./firebase-config.js";
+  import { 
+    HOUSES, 
+    registerParticipant, 
+    listenParticipants, 
+    houseById,
+    listenPrograms,
+    registerToProgram,
+    deregisterFromProgram,
+    listenRegistrations
+  } from "./firebase-config.js";
 
   const gate = document.getElementById("gate");
   const dashboard = document.getElementById("dashboard");
@@ -102,7 +145,12 @@
 
   let currentTeam = null;
   let allParticipants = [];
+  let allPrograms = [];
+  let allRegistrations = [];
+
   let rosterListener = null;
+  let programListener = null;
+  let registrationsListener = null;
 
   document.getElementById("team-login-btn").addEventListener("click", () => {
     const teamId = teamSelect.value;
@@ -119,16 +167,15 @@
       return;
     }
 
-    if (rosterListener) {
-      rosterListener();
-    }
+    // Clean any old stale listeners before re-logging
+    cleanUpListeners();
 
     currentTeam = house;
     gate.classList.add("hidden");
     dashboard.classList.remove("hidden");
     dashTitle.textContent = `${house.id} Roster`;
     dashTitle.style.color = house.color;
-    startRosterListener();
+    startDashboardListeners();
   });
 
   document.getElementById("signout-btn").addEventListener("click", () => {
@@ -137,19 +184,39 @@
     teamSelect.value = "";
     dashboard.classList.add("hidden");
     gate.classList.remove("hidden");
-    if (rosterListener) {
-      rosterListener();
-      rosterListener = null;
-    }
+    cleanUpListeners();
   });
 
-  function startRosterListener() {
+  function cleanUpListeners() {
+    if (rosterListener) { rosterListener(); rosterListener = null; }
+    if (programListener) { programListener(); programListener = null; }
+    if (registrationsListener) { registrationsListener(); registrationsListener = null; }
+  }
+
+  function startDashboardListeners() {
+    // 1. Listen for Participants updates
     rosterListener = listenParticipants((participants) => {
       allParticipants = participants;
       renderRoster();
+      populateCandidateDropdown();
+      renderEnrollments();
+    });
+
+    // 2. Listen for Programs updates
+    programListener = listenPrograms((programs) => {
+      allPrograms = (programs || []).sort((a, b) => a.id.localeCompare(b.id));
+      populateProgramDropdown();
+      renderEnrollments();
+    });
+
+    // 3. Listen for Registrations mappings
+    registrationsListener = listenRegistrations((registrations) => {
+      allRegistrations = registrations;
+      renderEnrollments();
     });
   }
 
+  // Render House Candidate Roster
   function renderRoster() {
     if (!currentTeam) return;
     const mine = allParticipants
@@ -176,6 +243,95 @@
       .join("");
   }
 
+  // Populate Dropdown for House Candidates
+  function populateCandidateDropdown() {
+    const select = document.getElementById("enroll-candidate");
+    const current = select.value;
+    if (!currentTeam) return;
+
+    const mine = allParticipants
+      .filter((p) => p.team === currentTeam.id)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    select.innerHTML =
+      `<option value="">— Select house candidate —</option>` +
+      mine.map((p) => `<option value="${p.id}">${p.name} (${p.id})</option>`).join("");
+
+    if (current && mine.some(p => p.id === current)) {
+      select.value = current;
+    }
+  }
+
+  // Populate Dropdown for Admin Programs
+  function populateProgramDropdown() {
+    const select = document.getElementById("enroll-program");
+    const current = select.value;
+
+    select.innerHTML =
+      `<option value="">— Select program —</option>` +
+      allPrograms.map((p) => `<option value="${p.id}">${p.id} — ${p.title}</option>`).join("");
+
+    if (current && allPrograms.some(p => p.id === current)) {
+      select.value = current;
+    }
+  }
+
+  // Render Enrollments mapped to this house's candidates
+  function renderEnrollments() {
+    if (!currentTeam) return;
+    const listEl = document.getElementById("enrollments-list");
+
+    const myParticipantsIds = new Set(
+      allParticipants
+        .filter((p) => p.team === currentTeam.id)
+        .map((p) => p.id)
+    );
+
+    const mine = allRegistrations.filter((reg) => myParticipantsIds.has(reg.participant_id));
+
+    if (mine.length === 0) {
+      listEl.innerHTML = `<div class="empty-state">No program enrollments registered yet.</div>`;
+      return;
+    }
+
+    listEl.innerHTML = mine
+      .map((reg) => {
+        const participant = allParticipants.find((p) => p.id === reg.participant_id) || { name: reg.participant_id };
+        const program = allPrograms.find((pg) => pg.id === reg.program_id) || { title: reg.program_id };
+        return `
+          <div class="roster-row" style="margin-bottom: 8px;">
+            <div class="who">
+              <span>${participant.name} <span class="code" style="font-size: 0.72rem;">(${reg.participant_id})</span></span>
+              <span style="font-size:0.78rem; color:#6b6b6b; display: block; margin-top: 3px;">
+                ⚡ Enrolled: <b>${program.title}</b> (${reg.program_id})
+              </span>
+            </div>
+            <button class="btn btn-danger" data-dereg-program="${reg.program_id}" data-dereg-participant="${reg.participant_id}" style="padding: 6px 12px; font-size: 0.72rem;">Remove</button>
+          </div>
+        `;
+      })
+      .join("");
+
+    // Wire-up removal buttons
+    listEl.querySelectorAll("[data-dereg-program]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const progId = btn.getAttribute("data-dereg-program");
+        const partId = btn.getAttribute("data-dereg-participant");
+        const targetPart = allParticipants.find(p => p.id === partId) || { name: partId };
+        const targetProg = allPrograms.find(p => p.id === progId) || { title: progId };
+
+        if (!confirm(`Cancel enrollment for "${targetPart.name}" in "${targetProg.title}"?`)) return;
+
+        try {
+          await deregisterFromProgram(progId, partId);
+        } catch (err) {
+          alert("Error canceling registration: " + err.message);
+        }
+      });
+    });
+  }
+
+  // Register Candidate Registration Submit Handler
   document.getElementById("register-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const nameInput = document.getElementById("cand-name");
@@ -188,6 +344,32 @@
       statusEl.innerHTML = `<div class="status-msg ok">Registered "${code}" to ${currentTeam.id}.</div>`;
       nameInput.value = "";
       codeInput.value = "";
+    } catch (err) {
+      statusEl.innerHTML = `<div class="status-msg err">${err.message}</div>`;
+    }
+  });
+
+  // Enroll in Program Submit Handler
+  document.getElementById("program-enroll-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const candSelect = document.getElementById("enroll-candidate");
+    const progSelect = document.getElementById("enroll-program");
+    const statusEl = document.getElementById("enroll-status");
+    statusEl.innerHTML = "";
+
+    const candId = candSelect.value;
+    const progId = progSelect.value;
+
+    if (!candId || !progId) {
+      statusEl.innerHTML = `<div class="status-msg err">Choose both a candidate and program.</div>`;
+      return;
+    }
+
+    try {
+      await registerToProgram(progId, candId);
+      statusEl.innerHTML = `<div class="status-msg ok">Candidate successfully enrolled!</div>`;
+      candSelect.value = "";
+      progSelect.value = "";
     } catch (err) {
       statusEl.innerHTML = `<div class="status-msg err">${err.message}</div>`;
     }
