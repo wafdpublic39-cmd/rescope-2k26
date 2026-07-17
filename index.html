@@ -255,11 +255,9 @@
   }
 
   // ---------- Category Detection Helper (ULTRA-ROBUST) ----------
-  // Deep Keyword & Flag Scanner to guarantee zero program misclassifications
   function getProgramCategory(p) {
     if (!p) return 'art';
     
-    // Explicit array of sports terms to cleanly trap edge cases like 'wrestling'
     const sportsKeywords = [
       'sport', 'sports', 'wrestling', 'wrestle', 'football', 'cricket', 
       'volleyball', 'basketball', 'badminton', 'tennis', 'kabaddi', 
@@ -282,7 +280,6 @@
       }
     }
     
-    // Fallback checks on alphanumeric program routing syntax codes
     const code = String(p.id || '').toLowerCase().trim();
     if (code.startsWith('s') || code.startsWith('fb') || code.startsWith('bb') || code.startsWith('at') || code.includes('sport')) {
       return 'sport';
@@ -292,8 +289,6 @@
   }
 
   // ---------- Standings Points Compiler ----------
-  // Computes art and sport splits dynamically from individual program results,
-  // falling back safely to columns if already loaded on the database.
   function getHousePoints(teamId) {
     const computed = { art: 0, sport: 0, total: 0 };
 
@@ -313,15 +308,15 @@
     const dbTeam = teamsData.find(t => t.id === teamId);
     if (!dbTeam) return computed;
 
-    // Use DB data if custom columns exist; fallback to computed splits
-    const artPts = dbTeam.artsPoints !== undefined ? dbTeam.artsPoints : (dbTeam.artPoints !== undefined ? dbTeam.artPoints : computed.art);
-    const sportPts = dbTeam.sportsPoints !== undefined ? dbTeam.sportsPoints : (dbTeam.sportPoints !== undefined ? dbTeam.sportPoints : computed.sport);
-    const totalPts = dbTeam.totalPoints !== undefined ? dbTeam.totalPoints : (artPts + sportPts);
+    // FIX: Safely parse both camelCase and snake_case schema naming variants, ensuring zero NaNs
+    const artPts = dbTeam.artsPoints !== undefined ? dbTeam.artsPoints : (dbTeam.artPoints !== undefined ? dbTeam.artPoints : (dbTeam.arts_points !== undefined ? dbTeam.arts_points : computed.art));
+    const sportPts = dbTeam.sportsPoints !== undefined ? dbTeam.sportsPoints : (dbTeam.sportPoints !== undefined ? dbTeam.sportPoints : (dbTeam.sports_points !== undefined ? dbTeam.sports_points : computed.sport));
+    const totalPts = dbTeam.totalPoints !== undefined ? dbTeam.totalPoints : (dbTeam.total_points !== undefined ? dbTeam.total_points : (Number(artPts || 0) + Number(sportPts || 0)));
 
     return {
-      art: artPts,
-      sport: sportPts,
-      total: totalPts
+      art: Number(artPts) || 0,
+      sport: Number(sportPts) || 0,
+      total: Number(totalPts) || 0
     };
   }
 
@@ -583,6 +578,8 @@
       })
       .join("");
 
+    const totalPtsValue = participant.totalPoints !== undefined ? participant.totalPoints : (participant.total_points !== undefined ? participant.total_points : 0);
+
     lookupResult.innerHTML = `
       <div class="panel">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
@@ -592,7 +589,7 @@
             <span class="team-pill" style="--house-color:${house.color};margin-top:6px;display:inline-flex;">${participant.team}</span>
           </div>
           <div style="text-align:right;">
-            <div class="score" style="font-size:2.2rem;">${participant.totalPoints || 0}</div>
+            <div class="score" style="font-size:2.2rem;">${totalPtsValue}</div>
             <div class="score-label">Total Points</div>
           </div>
         </div>
