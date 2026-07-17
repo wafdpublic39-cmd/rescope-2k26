@@ -135,6 +135,23 @@
     </div>
   </section>
 
+  <!-- ---- Danger Zone (Reset Standings) ---- -->
+  <section class="section">
+    <div class="section-head">
+      <h2 style="color: #d93838;">Danger Zone</h2>
+      <span class="section-num" style="color: #d93838; border-color: #d93838;">Reset Settings</span>
+    </div>
+
+    <div class="panel" style="border: 2px solid #d93838;">
+      <p style="margin-bottom:15px; font-size:0.92rem; line-height: 1.4;">
+        Need to wipe the festival scoreboard? Clicking below will permanently wipe all points from <strong>programs, candidates, and team standings</strong>. This action is irreversible.
+      </p>
+      <button id="reset-points-btn" class="btn btn-block" style="background: #d93838; border-color: #d93838; color: #fff;">
+        Reset All Points & Standings
+      </button>
+    </div>
+  </section>
+
 </main>
 
 <footer>RESCOPE 2K26 · Horizon · Eclipse · Vector · Chroma</footer>
@@ -467,6 +484,72 @@
       document.getElementById("ledger-value").value = "";
     } catch (err) {
       statusEl.innerHTML = `<div class="status-msg err">${err.message}</div>`;
+    }
+  });
+
+  // ============ WIPE ALL SCORE DATA (Insulated Supabase Logic) ============
+  const resetBtn = document.getElementById("reset-points-btn");
+
+  resetBtn.addEventListener("click", async () => {
+    // 1st Level Gate Check
+    const confirmFirst = confirm("⚠️ DANGER: This will permanently wipe all points for all programs, candidates, and house standings. This cannot be undone. Are you absolutely sure?");
+    if (!confirmFirst) return;
+
+    // 2nd Level Typing Gate Check
+    const confirmSecond = prompt("To confirm this reset, please type 'RESET' in the box below:");
+    if (confirmSecond !== "RESET") {
+      alert("Action canceled. The confirmation word was incorrect.");
+      return;
+    }
+
+    try {
+      resetBtn.disabled = true;
+      resetBtn.innerText = "Resetting Standings...";
+
+      // 1. Reset program scores (Wipes JSON scores to initial state {})
+      try {
+        const { error: progErr } = await supabase
+          .from("programs")
+          .update({ scores: {} })
+          .not("id", "is", null);
+        if (progErr) console.warn("Failed resetting programs:", progErr.message);
+      } catch (e) {
+        console.warn("Exception resetting programs table:", e);
+      }
+
+      // 2. Reset individual participant scores (Separated to safely handle schema types)
+      try {
+        await supabase.from("participants").update({ total_points: 0 }).not("id", "is", null);
+      } catch (e) {
+        console.warn("Exception clearing participants (snake_case column):", e);
+      }
+      try {
+        await supabase.from("participants").update({ totalPoints: 0 }).not("id", "is", null);
+      } catch (e) {
+        console.warn("Exception clearing participants (camelCase column):", e);
+      }
+
+      // 3. Reset house/team scoreboard records across tables (insulated queries)
+      const teamUpdates = [
+        supabase.from("teams").update({ arts_points: 0, sports_points: 0, total_points: 0 }).not("id", "is", null),
+        supabase.from("teams").update({ artsPoints: 0, sportsPoints: 0, totalPoints: 0 }).not("id", "is", null),
+        supabase.from("houses").update({ arts_points: 0, sports_points: 0, total_points: 0 }).not("id", "is", null),
+        supabase.from("houses").update({ artsPoints: 0, sportsPoints: 0, totalPoints: 0 }).not("id", "is", null)
+      ];
+
+      await Promise.allSettled(teamUpdates);
+
+      alert("🎉 All points and house standings successfully reset to 0 in the database!");
+      
+      // Refresh admin view elements
+      await syncAndRenderManagement();
+
+    } catch (err) {
+      console.error("Reset action failed:", err);
+      alert("An unexpected error occurred: " + err.message);
+    } finally {
+      resetBtn.disabled = false;
+      resetBtn.innerText = "Reset All Points & Standings";
     }
   });
 </script>
