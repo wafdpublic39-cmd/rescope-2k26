@@ -74,6 +74,23 @@
     </div>
   </section>
 
+  <!-- ---- ADMIN DIRECT REMOVAL DECK (Candidates & Enrollments) ---- -->
+  <section class="section two-col" style="border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); padding-top: 25px; padding-bottom: 30px;">
+    <div class="panel">
+      <h3 style="margin-bottom:18px;font-size:1.1rem; color:#d93838;">Manage Candidates (Delete)</h3>
+      <div id="admin-candidates-list" style="max-height: 300px; overflow-y: auto;">
+        <div class="empty-state">Loading candidate list...</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-bottom:18px;font-size:1.1rem; color:#d93838;">Manage Enrollments (Remove)</h3>
+      <div id="admin-enrollments-list" style="max-height: 300px; overflow-y: auto;">
+        <div class="empty-state">Loading registration files...</div>
+      </div>
+    </div>
+  </section>
+
   <!-- ---- Points Ledger Adjuster ---- -->
   <section class="section">
     <div class="section-head">
@@ -91,8 +108,10 @@
             </select>
           </div>
           <div class="field">
-            <label for="ledger-code">Candidate code</label>
-            <input type="text" id="ledger-code" placeholder="e.g. HZ07" required />
+            <label for="ledger-code">Select Candidate</label>
+            <select id="ledger-code" required>
+              <option value="">— Select active candidate —</option>
+            </select>
           </div>
         </div>
 
@@ -127,6 +146,7 @@
     deleteProgram,
     awardPoints,
     listenPrograms,
+    supabase
   } from "./firebase-config.js";
 
   const gate = document.getElementById("gate");
@@ -140,6 +160,7 @@
       dashboard.classList.remove("hidden");
       gateError.textContent = "";
       startProgramListener();
+      startManagementRealtime();
     } else {
       gateError.textContent = "Incorrect master password.";
     }
@@ -152,6 +173,8 @@
   });
 
   let programsData = [];
+  let participantsData = [];
+  let registrationsData = [];
   let programListenerStarted = false;
 
   function startProgramListener() {
@@ -161,7 +184,32 @@
       programsData = programs.sort((a, b) => a.id.localeCompare(b.id));
       renderProgramList();
       renderLedgerProgramOptions();
+      renderEnrollmentsManagement();
     });
+  }
+
+  function startManagementRealtime() {
+    supabase.channel('public:participants').on('postgres_changes', { event: '*', schema: 'public', table: 'participants' }, () => {
+      syncAndRenderManagement();
+    }).subscribe();
+
+    supabase.channel('public:registrations').on('postgres_changes', { event: '*', schema: 'public', table: 'registrations' }, () => {
+      syncAndRenderManagement();
+    }).subscribe();
+
+    syncAndRenderManagement();
+  }
+
+  async function syncAndRenderManagement() {
+    const { data: parts } = await supabase.from("participants").select("*");
+    const { data: regs } = await supabase.from("registrations").select("*");
+    
+    if (parts) participantsData = parts.sort((a, b) => a.id.localeCompare(b.id));
+    if (regs) registrationsData = regs;
+
+    renderCandidatesManagement();
+    renderEnrollmentsManagement();
+    renderLedgerCandidateOptions(); // Updates ledger candidates dropdown
   }
 
   function getProgramCategory(p) {
@@ -211,6 +259,79 @@
     });
   }
 
+  function renderCandidatesManagement() {
+    const el = document.getElementById("admin-candidates-list");
+    if (participantsData.length === 0) {
+      el.innerHTML = `<div class="empty-state">No candidates registered down the rosters.</div>`;
+      return;
+    }
+    
+    el.innerHTML = participantsData.map(p => `
+      <div class="roster-row" style="margin-bottom: 6px;">
+        <div class="who">
+          <span>${p.name} <small style="color:#6b6b6b;font-weight:bold;">(${p.team})</small></span>
+          <span class="code">${p.id}</span>
+        </div>
+        <button class="btn btn-danger" data-delete-candidate="${p.id}" style="padding:6px 10px;font-size:0.72rem;">Delete</button>
+      </div>
+    `).join("");
+
+    el.querySelectorAll("[data-delete-candidate]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const cid = btn.dataset.deleteCandidate;
+        if (!confirm(`Permanently wipe candidate "${cid}" from the system? This removes them from their house roster.`)) return;
+        try {
+          const { error } = await supabase.from("participants").delete().eq("id", cid);
+          if (error) throw error;
+          syncAndRenderManagement();
+        } catch (err) {
+          alert("Error: " + err.message);
+        }
+      });
+    });
+  }
+
+  function renderEnrollmentsManagement() {
+    const el = document.getElementById("admin-enrollments-list");
+    if (registrationsData.length === 0) {
+      el.innerHTML = `<div class="empty-state">No active program enrollments found.</div>`;
+      return;
+    }
+
+    el.innerHTML = registrationsData.map(r => {
+      const p = participantsData.find(part => part.id === r.participant_id) || { name: r.participant_id };
+      const prog = programsData.find(pr => pr.id === r.program_id) || { title: r.program_id };
+      const catIcon = getProgramCategory(prog) === 'art' ? '🎨' : '⚽';
+      
+      return `
+        <div class="roster-row" style="margin-bottom: 6px;">
+          <div class="who">
+            <span>${p.name} <small style="color:#6b6b6b;">(${r.participant_id})</small></span>
+            <span class="code" style="font-size:0.75rem; background:none; border:none; padding:0; color:#444; font-weight:normal; text-transform:none; letter-spacing:0;">
+              ${catIcon} Enrolled: <strong>${prog.title}</strong> (${r.program_id})
+            </span>
+          </div>
+          <button class="btn btn-danger" data-del-prog="${r.program_id}" data-del-part="${r.participant_id}" style="padding:6px 10px;font-size:0.72rem;">Remove</button>
+        </div>
+      `;
+    }).join("");
+
+    el.querySelectorAll("[data-del-prog]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const pid = btn.getAttribute("data-del-prog");
+        const cid = btn.getAttribute("data-del-part");
+        if (!confirm(`Cancel enrollment for candidate ${cid} in event program ${pid}?`)) return;
+        try {
+          const { error } = await supabase.from("registrations").delete().eq("program_id", pid).eq("participant_id", cid);
+          if (error) throw error;
+          syncAndRenderManagement();
+        } catch (err) {
+          alert("Error: " + err.message);
+        }
+      });
+    });
+  }
+
   function renderLedgerProgramOptions() {
     const select = document.getElementById("ledger-program");
     const current = select.value;
@@ -229,6 +350,30 @@
     if (current) select.value = current;
   }
 
+  function renderLedgerCandidateOptions() {
+    const select = document.getElementById("ledger-code");
+    const current = select.value;
+
+    const houses = ["Horizon", "Eclipse", "Vector", "Chroma"];
+    let html = `<option value="">— Select active candidate —</option>`;
+
+    houses.forEach(house => {
+      const houseMembers = participantsData.filter(p => p.team === house);
+      if (houseMembers.length > 0) {
+        html += `<optgroup label="🏠 ${house} House">`;
+        houseMembers.forEach(p => {
+          html += `<option value="${p.id}">${p.id} — ${p.name}</option>`;
+        });
+        html += `</optgroup>`;
+      }
+    });
+
+    select.innerHTML = html;
+    if (current && participantsData.some(p => p.id === current)) {
+      select.value = current;
+    }
+  }
+
   document.getElementById("add-program-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const codeInput = document.getElementById("program-code");
@@ -237,9 +382,8 @@
     const statusEl = document.getElementById("add-program-status");
     statusEl.innerHTML = "";
     try {
-      // Passes the category value along to the data adapter
       const code = await addProgram(codeInput.value, titleInput.value, categoryInput.value);
-      statusEl.innerHTML = `<div class="status-msg ok">Program "${code}" added successfully.</div>`;
+      statusEl.innerHTML = `<div class="status-msg ok">Program "${code}" added.</div>`;
       codeInput.value = "";
       titleInput.value = "";
     } catch (err) {
@@ -269,8 +413,8 @@
       statusEl.innerHTML = `<div class="status-msg err">Select a program first.</div>`;
       return;
     }
-    if (!candidateCode.trim()) {
-      statusEl.innerHTML = `<div class="status-msg err">Enter a candidate code.</div>`;
+    if (!candidateCode) {
+      statusEl.innerHTML = `<div class="status-msg err">Select a candidate.</div>`;
       return;
     }
     if (!rawValue || rawValue <= 0) {
