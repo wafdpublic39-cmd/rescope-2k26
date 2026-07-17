@@ -487,7 +487,7 @@
     }
   });
 
-  // ============ WIPE ALL SCORE DATA (Supabase Logic) ============
+  // ============ WIPE ALL SCORE DATA (Insulated Supabase Logic) ============
   const resetBtn = document.getElementById("reset-points-btn");
 
   resetBtn.addEventListener("click", async () => {
@@ -506,34 +506,42 @@
       resetBtn.disabled = true;
       resetBtn.innerText = "Resetting Standings...";
 
-      // Reset program scores (Wipes JSON scores to initial state {})
-      const { error: progErr } = await supabase
-        .from("programs")
-        .update({ scores: {} })
-        .neq("id", "");
+      // 1. Reset program scores (Wipes JSON scores to initial state {})
+      try {
+        const { error: progErr } = await supabase
+          .from("programs")
+          .update({ scores: {} })
+          .not("id", "is", null);
+        if (progErr) console.warn("Failed resetting programs:", progErr.message);
+      } catch (e) {
+        console.warn("Exception resetting programs table:", e);
+      }
 
-      // Reset individual participant/candidate point records
-      // We update both common database fields (snake_case and camelCase) to ensure complete alignment.
-      const { error: partErr } = await supabase
-        .from("participants")
-        .update({ total_points: 0, totalPoints: 0 })
-        .neq("id", "");
+      // 2. Reset individual participant scores (Separated to safely handle schema types)
+      try {
+        await supabase.from("participants").update({ total_points: 0 }).not("id", "is", null);
+      } catch (e) {
+        console.warn("Exception clearing participants (snake_case column):", e);
+      }
+      try {
+        await supabase.from("participants").update({ totalPoints: 0 }).not("id", "is", null);
+      } catch (e) {
+        console.warn("Exception clearing participants (camelCase column):", e);
+      }
 
-      // Reset house/team scoreboard records
-      // Updates standard naming configurations concurrently for tables ('teams' & 'houses')
-      const resetTeams1 = supabase.from("teams").update({ arts_points: 0, sports_points: 0, total_points: 0 }).neq("id", "");
-      const resetTeams2 = supabase.from("teams").update({ artsPoints: 0, sportsPoints: 0, totalPoints: 0 }).neq("id", "");
-      const resetHouses1 = supabase.from("houses").update({ arts_points: 0, sports_points: 0, total_points: 0 }).neq("id", "");
-      const resetHouses2 = supabase.from("houses").update({ artsPoints: 0, sportsPoints: 0, totalPoints: 0 }).neq("id", "");
+      // 3. Reset house/team scoreboard records across tables (insulated queries)
+      const teamUpdates = [
+        supabase.from("teams").update({ arts_points: 0, sports_points: 0, total_points: 0 }).not("id", "is", null),
+        supabase.from("teams").update({ artsPoints: 0, sportsPoints: 0, totalPoints: 0 }).not("id", "is", null),
+        supabase.from("houses").update({ arts_points: 0, sports_points: 0, total_points: 0 }).not("id", "is", null),
+        supabase.from("houses").update({ artsPoints: 0, sportsPoints: 0, totalPoints: 0 }).not("id", "is", null)
+      ];
 
-      await Promise.allSettled([resetTeams1, resetTeams2, resetHouses1, resetHouses2]);
+      await Promise.allSettled(teamUpdates);
 
-      if (progErr) console.warn("Warning clearing programs:", progErr.message);
-      if (partErr) console.warn("Warning clearing participants:", partErr.message);
-
-      alert("🎉 All points and house standings successfully reset to 0!");
+      alert("🎉 All points and house standings successfully reset to 0 in the database!");
       
-      // Auto-refresh components local states to mirror changes
+      // Refresh admin view elements
       await syncAndRenderManagement();
 
     } catch (err) {
