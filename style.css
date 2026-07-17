@@ -668,3 +668,23 @@ footer {
 @media (max-width: 900px) {
   .two-col { grid-template-columns: 1fr; }
 }
+
+body {
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('RESCOPE LOGO.jpg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 40%; /* Adjust size as preferred */
+  opacity: 0.05; /* Low opacity for watermark effect */
+  z-index: -1;
+  pointer-events: none; /* Allows clicks to pass through to content */
+}
