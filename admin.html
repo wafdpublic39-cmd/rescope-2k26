@@ -212,20 +212,28 @@
     renderLedgerCandidateOptions();
   }
 
-  // ULTRA-ROBUST: Deep Object Scanner Engine
+  // UPDATED ENGINE: Explicitly scans for sports keywords to prevent misclassification
   function getProgramCategory(p) {
     if (!p) return 'art';
     
-    // Debug line: inspect this in your browser DevTools (F12) to see exactly what database fields exist
-    console.log("RESCOPE Program Scanner Data:", p);
+    // Explicit list of known sports names/keywords to identify them automatically
+    const sportsKeywords = [
+      'sport', 'sports', 'wrestling', 'wrestle', 'football', 'cricket', 
+      'volleyball', 'basketball', 'badminton', 'tennis', 'kabaddi', 
+      'athletics', 'race', 'running', 'chess', 'carrom', 'tug of war', 'match'
+    ];
 
-    // 1. Scan all object properties dynamically for any string containing "sport" or true boolean values
     for (const key in p) {
       if (Object.prototype.hasOwnProperty.call(p, key)) {
         const val = p[key];
         if (typeof val === 'string') {
           const s = val.toLowerCase().trim();
-          if (s === 'sport' || s === 'sports' || s.includes('sport')) {
+          
+          // Check if field equals or contains explicit database flags
+          if (s === 'sport' || s === 'sports') return 'sport';
+          
+          // Check if the title text matches any common athletic keywords
+          if (sportsKeywords.some(kw => s.includes(kw))) {
             return 'sport';
           }
         }
@@ -235,7 +243,6 @@
       }
     }
     
-    // 2. Fallback prefix code scanning if database fields are missing/null
     const code = String(p.id || '').toLowerCase().trim();
     if (code.startsWith('s') || code.startsWith('fb') || code.startsWith('bb') || code.startsWith('at') || code.includes('sport')) {
       return 'sport';
@@ -327,13 +334,14 @@
       const p = participantsData.find(part => part.id === r.participant_id) || { name: r.participant_id };
       const prog = programsData.find(pr => pr.id === r.program_id) || { title: r.program_id };
       const catIcon = getProgramCategory(prog) === 'art' ? '🎨' : '⚽';
+      const label = getProgramCategory(prog) === 'art' ? 'Art' : 'Sport';
       
       return `
         <div class="roster-row" style="margin-bottom: 6px;">
           <div class="who">
             <span>${p.name} <small style="color:#6b6b6b;">(${r.participant_id})</small></span>
             <span class="code" style="font-size:0.75rem; background:none; border:none; padding:0; color:#444; font-weight:normal; text-transform:none; letter-spacing:0;">
-              ${catIcon} Enrolled: <strong>${prog.title}</strong> (${r.program_id})
+              ${catIcon} Enrolled: <strong>${prog.title}</strong> (${r.program_id}) — <small style="color:#6b6b6b;">${label}</small>
             </span>
           </div>
           <button class="btn btn-danger" data-del-prog="${r.program_id}" data-del-part="${r.participant_id}" style="padding:6px 10px;font-size:0.72rem;">Remove</button>
