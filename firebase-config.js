@@ -18,18 +18,7 @@ try {
 
 // ---- Event Constants ----
 
-export async function getAdminPassword() {
-  if (!supabase) throw new Error("Database client not connected.");
-  
-  const { data, error } = await supabase
-    .from('app_config')
-    .select('value')
-    .eq('key', 'admin_password')
-    .single();
-
-  if (error) throw error;
-  return data.value;
-}
+export const ADMIN_PASSWORD = "core";
 
 export const HOUSES = [
   { id: "Horizon", label: "HORIZON", color: "#06AED5", passcode: "horizon26" },
