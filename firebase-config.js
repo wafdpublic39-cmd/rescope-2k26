@@ -24,7 +24,7 @@ export const HOUSES = [
   { id: "Horizon", label: "HORIZON", color: "#06AED5", passcode: "horizon26" },
   { id: "Eclipse", label: "ECLIPSE", color: "#1B1F3B", passcode: "eclipse26" },
   { id: "Vector", label: "VECTOR", color: "#0B8457", passcode: "vector26" },
-  { id: "Chroma", label: "CHROMA", color: "#D7263D", passcode: "chroma26" },
+  { id: "Chroma", label: "CHROMA", color: "#D7263D", passcode: "myteamchroma.co" },
 ];
 
 export function houseById(id) {
