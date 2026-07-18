@@ -53,7 +53,7 @@ html, body {
    min-height: 100vh;
   position: relative;
   animation: page-fade 0.5s ease both;
-  background: linear-gradient(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.95)), url('RESCOPE LOGO.png');
+  background: linear-gradient(rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.90)), url('RESCOPE LOGO.png');
   background-repeat: no-repeat;
   background-position: center;
   background-attachment: fixed;
